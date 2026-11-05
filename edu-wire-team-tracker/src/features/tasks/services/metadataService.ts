@@ -75,5 +75,28 @@ export const metadataService = {
       }
     }
   },
+
+  /**
+   * Fetches eligible supervisors (Team Leads, Branch Admins, Super Admins) in a branch for Reporting Manager selection
+   */
+  async getBranchSupervisors(branchId?: string): Promise<TeamMemberOption[]> {
+    try {
+      const params: Record<string, string> = { limit: '100' }
+      if (branchId && branchId !== 'all') params.branch = branchId
+      const response = await apiClient.get<any>('/users', { params })
+      const raw = response.data
+      const list = Array.isArray(raw) ? raw : (raw?.data || raw?.users || [])
+      return list
+        .filter((u: any) => u.isActive && ['Team Lead', 'Branch Admin', 'Super Admin'].includes(u.role))
+        .map((u: any) => ({
+          id: u.id || u._id,
+          name: u.name,
+          email: u.email,
+          role: u.role,
+        }))
+    } catch {
+      return []
+    }
+  },
 }
 

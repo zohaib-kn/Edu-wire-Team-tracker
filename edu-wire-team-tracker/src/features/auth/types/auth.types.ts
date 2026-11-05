@@ -30,7 +30,9 @@ export interface User {
   lastName?: string
   role: UserRole
   branchId?: string | null
+  branch?: string | null
   teamId?: string | null
+  teams?: string[]
   mustChangePassword: boolean
   status?: 'active' | 'inactive' | 'locked' | string
   permissions: PermissionEntry[]

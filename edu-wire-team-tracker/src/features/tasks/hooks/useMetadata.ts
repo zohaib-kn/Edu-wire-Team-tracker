@@ -28,3 +28,12 @@ export function useTeamMembers(teamId: string) {
   })
 }
 
+export function useBranchSupervisors(branchId?: string) {
+  return useQuery<TeamMemberOption[]>({
+    queryKey: ['metadata', 'supervisors', branchId],
+    queryFn: () => metadataService.getBranchSupervisors(branchId),
+    enabled: Boolean(branchId),
+    staleTime: 2 * 60 * 1000,
+  })
+}
+

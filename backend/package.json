@@ -8,7 +8,12 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "seed": "tsx src/scripts/seed.ts",
+    "test:auth": "tsx src/scripts/test-auth.ts",
+    "test:tasks": "tsx src/scripts/test-tasks.ts",
+    "test:phase4": "tsx src/scripts/test-phase4.ts",
+    "test:reporting-manager": "tsx src/scripts/test-reporting-manager.ts"
   },
   "keywords": [],
   "author": "",

@@ -2,6 +2,7 @@ import express, { type Application } from 'express'
 import cors from 'cors'
 import helmet from 'helmet'
 import cookieParser from 'cookie-parser'
+import './models/index.js' // Eagerly register all Mongoose models
 import { env } from './config/env.js'
 import { apiRouter } from './routes/index.js'
 import { notFoundHandler } from './middleware/notFound.js'

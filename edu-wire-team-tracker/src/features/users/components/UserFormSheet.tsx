@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Modal } from '@/components/ui/Modal'
 import { Alert } from '@/components/ui/Alert'
-import { createUserSchema, type CreateUserFormValues } from '../schemas/userAdminSchemas'
+import { createUserSchema, editUserSchema, type CreateUserFormValues } from '../schemas/userAdminSchemas'
 import { useCreateUser, useUpdateUser } from '../hooks/useUserMutations'
 import { useBranches, useTeams } from '@/features/tasks/hooks/useMetadata'
 import { useAuth } from '@/features/auth/hooks/useAuth'
@@ -72,7 +72,7 @@ function UserFormSheetInner({
     reset,
     formState: { errors, isDirty, isSubmitting },
   } = useForm<CreateUserFormValues>({
-    resolver: zodResolver(createUserSchema),
+    resolver: zodResolver(isEditing ? editUserSchema : createUserSchema) as any,
     defaultValues,
     mode: 'onTouched',
   })
@@ -81,7 +81,17 @@ function UserFormSheetInner({
   const selectedBranch = useWatch({ control, name: 'branch' }) || ''
   const selectedTeams = useWatch({ control, name: 'teams' }) || []
 
-  const eligibleTeams = allTeams.filter((t) => !t.branchId || !selectedBranch || t.branchId === selectedBranch)
+  const matchingBranch = branches.find((b) => b.id === selectedBranch || b.name === selectedBranch)
+  const branchIdToMatch = matchingBranch?.id || selectedBranch
+  const branchNameToMatch = matchingBranch?.name || selectedBranch
+
+  const eligibleTeams = allTeams.filter((t: any) => {
+    if (!selectedBranch) return true
+    return (
+      (t.branchId && (t.branchId === branchIdToMatch || t.branchId === branchNameToMatch)) ||
+      (t.branch && (t.branch === branchNameToMatch || t.branch === branchIdToMatch))
+    )
+  })
 
   const createUserMutation = useCreateUser()
   const updateUserMutation = useUpdateUser(userToEdit?.id || '')
@@ -103,10 +113,15 @@ function UserFormSheetInner({
   }
 
   // Toggle team selection
-  const handleToggleTeam = (teamId: string) => {
-    const next = selectedTeams.includes(teamId)
-      ? selectedTeams.filter((id) => id !== teamId)
-      : [...selectedTeams, teamId]
+  const handleToggleTeam = (teamIdentifier: string) => {
+    const targetTeam = allTeams.find((t: any) => t.id === teamIdentifier || t.name === teamIdentifier)
+    const id = targetTeam?.id || teamIdentifier
+    const name = targetTeam?.name || teamIdentifier
+
+    const isSelected = selectedTeams.some((val) => val === id || val === name)
+    const next = isSelected
+      ? selectedTeams.filter((val) => val !== id && val !== name)
+      : [...selectedTeams, id]
     setValue('teams', next, { shouldDirty: true })
   }
 
@@ -170,7 +185,11 @@ function UserFormSheetInner({
               variant="primary"
               size="md"
               isLoading={isSaving}
-              onClick={handleSubmit(onSubmit)}
+              onClick={handleSubmit(onSubmit, (err) => {
+                console.error('Validation errors:', err)
+                const firstError = Object.values(err)[0]?.message as string
+                if (firstError) setSubmitError(firstError)
+              })}
             >
               {isEditing ? 'Save Changes' : 'Create Account'}
             </Button>
@@ -311,13 +330,13 @@ function UserFormSheetInner({
             </label>
             {eligibleTeams.length > 0 ? (
               <div className="p-2 border border-slate-200 rounded-lg max-h-36 overflow-y-auto space-y-1 bg-slate-50/50">
-                {eligibleTeams.map((team) => {
-                  const isChecked = selectedTeams.includes(team.name || team.id)
+                {eligibleTeams.map((team: any) => {
+                  const isChecked = selectedTeams.some((val) => val === team.name || val === team.id)
                   return (
                     <button
                       key={team.id}
                       type="button"
-                      onClick={() => handleToggleTeam(team.name || team.id)}
+                      onClick={() => handleToggleTeam(team.id || team.name)}
                       className="w-full flex items-center justify-between p-2 rounded hover:bg-white text-xs text-left transition-colors cursor-pointer"
                     >
                       <span className="font-medium text-slate-800">{team.name}</span>

@@ -6,6 +6,10 @@ export const createTaskSchema = z.object({
     .min(1, 'Task title is required')
     .max(255, 'Title must be 255 characters or fewer')
     .trim(),
+  branch: z
+    .string()
+    .trim()
+    .optional(),
   team: z
     .string()
     .min(1, 'Please select a team')
@@ -14,6 +18,10 @@ export const createTaskSchema = z.object({
     .string()
     .min(1, 'Please select an assigned owner')
     .trim(),
+  reportingManager: z
+    .string()
+    .trim()
+    .optional(),
   due: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, 'Please select a valid due date (YYYY-MM-DD)'),
@@ -31,10 +39,22 @@ export const editTaskSchema = z.object({
     .min(1, 'Task title is required')
     .max(255, 'Title must be 255 characters or fewer')
     .trim(),
+  branch: z
+    .string()
+    .trim()
+    .optional(),
+  team: z
+    .string()
+    .trim()
+    .optional(),
   owner: z
     .string()
     .min(1, 'Please select an assigned owner')
     .trim(),
+  reportingManager: z
+    .string()
+    .trim()
+    .optional(),
   due: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, 'Please select a valid due date (YYYY-MM-DD)'),

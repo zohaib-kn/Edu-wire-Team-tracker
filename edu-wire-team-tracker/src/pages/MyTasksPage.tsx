@@ -1,8 +1,19 @@
 import { useState, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Search, Plus, Filter, RefreshCw, CheckCircle2, ChevronLeft, ChevronRight } from 'lucide-react'
+import {
+  Search,
+  Plus,
+  Filter,
+  RefreshCw,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  User,
+  ShieldCheck,
+} from 'lucide-react'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { useMyTasks } from '@/features/tasks/hooks/useMyTasks'
+import { useSupervisedTasks } from '@/features/tasks/hooks/useSupervisedTasks'
 import { TaskCard } from '@/features/tasks/components/TaskCard'
 import { TaskFormSheet } from '@/features/tasks/components/TaskFormSheet'
 import { TaskDeleteDialog } from '@/features/tasks/components/TaskDeleteDialog'
@@ -11,12 +22,15 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Spinner } from '@/components/ui/Spinner'
+import { cn } from '@/lib/utils/cn'
 import { canPerformTaskAction } from '@/features/tasks/utils/taskPermissions'
 import type { Task, TaskPriority, TaskStatus } from '@/features/tasks/types/task.types'
 
 export function MyTasksPage() {
   const { user } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
+
+  const viewMode = searchParams.get('view') === 'supervised' ? 'supervised' : 'assigned'
 
   // Filter state synchronized with URL search params
   const searchQuery = searchParams.get('q') || ''
@@ -28,13 +42,8 @@ export function MyTasksPage() {
 
   const limit = 12
 
-  // Fetch tasks with owner=me
-  const {
-    data: tasksData,
-    isLoading,
-    isError,
-    refetch,
-  } = useMyTasks({
+  // Queries for assigned vs supervised tasks
+  const myTasksQuery = useMyTasks({
     q: searchQuery,
     status: statusFilter,
     due: dueFilter,
@@ -42,6 +51,23 @@ export function MyTasksPage() {
     page: currentPage,
     limit,
   })
+
+  const supervisedTasksQuery = useSupervisedTasks({
+    q: searchQuery,
+    status: statusFilter,
+    due: dueFilter,
+    priority: priorityFilter,
+    page: currentPage,
+    limit,
+  })
+
+  const activeQuery = viewMode === 'supervised' ? supervisedTasksQuery : myTasksQuery
+  const {
+    data: tasksData,
+    isLoading,
+    isError,
+    refetch,
+  } = activeQuery
 
   // Sheet & Dialog state
   const [isSheetOpen, setIsSheetOpen] = useState(false)
@@ -81,8 +107,12 @@ export function MyTasksPage() {
     <div className="space-y-6">
       {/* Page Header */}
       <PageHeader
-        title="My Tasks"
-        description="Tasks assigned to you across branches and teams"
+        title={viewMode === 'supervised' ? 'Supervised Tasks' : 'My Tasks'}
+        description={
+          viewMode === 'supervised'
+            ? 'Tasks assigned to team members under your supervision and monitoring'
+            : 'Tasks assigned to you across branches and teams'
+        }
         actions={
           <div className="flex items-center gap-2">
             <Button
@@ -90,7 +120,7 @@ export function MyTasksPage() {
               size="sm"
               onClick={() => refetch()}
               leftIcon={<RefreshCw className="w-3.5 h-3.5" />}
-              aria-label="Refresh my tasks"
+              aria-label="Refresh tasks"
             >
               Refresh
             </Button>
@@ -110,6 +140,36 @@ export function MyTasksPage() {
           </div>
         }
       />
+
+      {/* View Switcher Tabs: Assigned to Me vs Supervised Tasks */}
+      <div className="flex items-center gap-1 bg-slate-100/90 p-1 rounded-xl max-w-xs border border-slate-200">
+        <button
+          type="button"
+          onClick={() => updateFilter('view', 'assigned')}
+          className={cn(
+            'flex-1 flex items-center justify-center gap-2 py-1.5 px-3 rounded-lg text-xs font-semibold transition-all cursor-pointer',
+            viewMode === 'assigned'
+              ? 'bg-white text-[#1D4ED8] shadow-xs font-bold'
+              : 'text-slate-600 hover:text-slate-900',
+          )}
+        >
+          <User className="w-3.5 h-3.5" />
+          <span>Assigned to Me</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => updateFilter('view', 'supervised')}
+          className={cn(
+            'flex-1 flex items-center justify-center gap-2 py-1.5 px-3 rounded-lg text-xs font-semibold transition-all cursor-pointer',
+            viewMode === 'supervised'
+              ? 'bg-white text-[#1D4ED8] shadow-xs font-bold'
+              : 'text-slate-600 hover:text-slate-900',
+          )}
+        >
+          <ShieldCheck className="w-3.5 h-3.5" />
+          <span>Supervised</span>
+        </button>
+      </div>
 
       {/* Filter Toolbar */}
       <div className="bg-white border border-[#E2E8F0] rounded-xl p-4 shadow-xs space-y-3">

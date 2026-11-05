@@ -9,6 +9,7 @@ import {
   Edit2,
   Trash2,
   History,
+  ShieldCheck,
 } from 'lucide-react'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { useTask } from '@/features/tasks/hooks/useTask'
@@ -181,17 +182,38 @@ export function TaskDetailPage() {
                   </div>
                 </div>
 
-                {/* Assigned Owner */}
+                {/* Assigned Owner (Completes Work) */}
                 <div className="flex items-start gap-2.5">
                   <div className="p-1.5 rounded-md bg-blue-50 text-[#1D4ED8]">
                     <User className="w-4 h-4" />
                   </div>
                   <div>
                     <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 block">
-                      Assigned Owner
+                      Assigned To
                     </span>
                     <span className="text-sm font-medium text-slate-800">
                       {task.owner || 'Unassigned'}
+                    </span>
+                    <span className="text-[11px] text-slate-400 block">
+                      Responsible for completing work
+                    </span>
+                  </div>
+                </div>
+
+                {/* Reporting Manager (Monitors Progress) */}
+                <div className="flex items-start gap-2.5">
+                  <div className="p-1.5 rounded-md bg-amber-50 text-amber-700">
+                    <ShieldCheck className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 block">
+                      Reporting Manager
+                    </span>
+                    <span className="text-sm font-medium text-slate-800">
+                      {task.reportingManager || 'Standard Team Lead'}
+                    </span>
+                    <span className="text-[11px] text-slate-400 block">
+                      Responsible for monitoring progress
                     </span>
                   </div>
                 </div>

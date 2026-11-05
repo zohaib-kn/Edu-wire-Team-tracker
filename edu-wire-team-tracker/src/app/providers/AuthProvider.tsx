@@ -1,59 +1,119 @@
 import {
+  useCallback,
+  useEffect,
   useState,
   type ReactNode,
 } from 'react'
+import { authService } from '@/features/auth/services/authService'
 import type {
+  ChangePasswordPayload,
   LoginCredentials,
   User,
 } from '@/features/auth/types/auth.types'
+import { onSessionExpired, setAccessToken } from '@/lib/api/apiClient'
+import { extractApiError } from '@/lib/api/errorHandler'
 import { AuthContext, type AuthContextValue } from './AuthContext'
 
-// Demo user enabled for frontend design review (no backend required)
-const DEMO_USER: User = {
-  id: 'usr_demo_01',
-  email: 'zohaib.works022@gmail.com',
-  name: 'Zohaib Khan',
-  role: 'Super Admin',
-  mustChangePassword: false, // Set to true to preview the mandatory Change Password screen
-  status: 'active',
-  permissions: [
-    'task.view',
-    'task.create',
-    'task.edit',
-    'task.status',
-    'task.delete',
-    'report.view',
-    'user.manage',
-    'team.manage',
-    'branch.manage',
-    'role.manage',
-  ],
-}
-
 export function AuthProvider({ children }: { children: ReactNode }) {
-  // Initialized directly with the demo user so you can immediately see the design
-  const [user, setUser] = useState<User | null>(DEMO_USER)
-  const [isLoading] = useState<boolean>(false)
+  const [user, setUser] = useState<User | null>(null)
+  const [isLoading, setIsLoading] = useState<boolean>(true)
+
+  // Handle session expiration detected by apiClient 401 interceptor
+  const handleSessionExpired = useCallback(() => {
+    setUser(null)
+    setAccessToken(null)
+  }, [])
+
+  useEffect(() => {
+    onSessionExpired(handleSessionExpired)
+  }, [handleSessionExpired])
+
+  // Fetches current user profile from GET /api/v1/auth/me
+  const fetchCurrentUser = useCallback(async (): Promise<User | null> => {
+    try {
+      const currentUser = await authService.getMe()
+      setUser(currentUser)
+      return currentUser
+    } catch {
+      setUser(null)
+      return null
+    }
+  }, [])
+
+  // Session restoration on initial page load / refresh using httpOnly cookie
+  useEffect(() => {
+    let isMounted = true
+
+    const restoreSession = async () => {
+      try {
+        // Attempt to exchange httpOnly refresh cookie for fresh access token
+        const refreshResult = await authService.refresh()
+
+        if (!isMounted) return
+
+        if (refreshResult.user) {
+          setUser(refreshResult.user)
+        } else {
+          // If refresh returned token only, fetch user profile
+          const me = await authService.getMe()
+          if (isMounted) setUser(me)
+        }
+      } catch {
+        // If refresh fails (e.g. 401 or no cookie), user remains unauthenticated
+        if (isMounted) {
+          setUser(null)
+          setAccessToken(null)
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false)
+        }
+      }
+    }
+
+    restoreSession()
+
+    return () => {
+      isMounted = false
+    }
+  }, [])
 
   const login = async (credentials: LoginCredentials): Promise<User> => {
-    const loggedInUser: User = {
-      ...DEMO_USER,
-      email: credentials.email || DEMO_USER.email,
+    try {
+      const response = await authService.login(credentials)
+      setUser(response.user)
+      return response.user
+    } catch (error) {
+      const parsed = extractApiError(error)
+      throw new Error(parsed.message, { cause: error })
     }
-    setUser(loggedInUser)
-    return loggedInUser
   }
 
   const logout = async (): Promise<void> => {
-    setUser(null)
+    try {
+      await authService.logout()
+    } catch {
+      // Clear client state even if network call failed
+      setAccessToken(null)
+    } finally {
+      setUser(null)
+    }
   }
 
-  const changePassword = async (): Promise<void> => {
-    setUser((prev) => (prev ? { ...prev, mustChangePassword: false } : null))
-  }
-
-  const fetchCurrentUser = async (): Promise<User | null> => {
-    return user
+  const changePassword = async (payload: ChangePasswordPayload): Promise<void> => {
+    try {
+      const response = await authService.changePassword(payload)
+      if (response.user) {
+        setUser(response.user)
+      } else {
+        // Re-fetch current user profile from server to guarantee authoritative state
+        const updatedUser = await authService.getMe()
+        setUser(updatedUser)
+      }
+    } catch (error) {
+      const parsed = extractApiError(error)
+      throw new Error(parsed.message, { cause: error })
+    }
   }
 
   const value: AuthContextValue = {

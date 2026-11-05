@@ -1,4 +1,5 @@
 import type { Server } from 'node:http'
+import './models/index.js'
 import { app } from './app.js'
 import { env } from './config/env.js'
 import { connectDatabase, disconnectDatabase } from './config/database.js'

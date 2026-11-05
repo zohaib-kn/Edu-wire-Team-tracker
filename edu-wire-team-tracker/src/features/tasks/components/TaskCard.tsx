@@ -63,6 +63,14 @@ export function TaskCard({ task, onEdit, onDelete }: TaskCardProps) {
               </span>
             )}
             <TaskPriorityBadge priority={task.priority} />
+            {task.reportingManager && (
+              <span
+                className="inline-flex items-center text-[10px] font-medium text-amber-700 bg-amber-50 rounded px-1.5 py-0.5 border border-amber-200/60"
+                title={`Reporting Manager: ${task.reportingManager}`}
+              >
+                RM: {task.reportingManager}
+              </span>
+            )}
           </div>
 
           {/* Action Menu (Edit/Delete) */}

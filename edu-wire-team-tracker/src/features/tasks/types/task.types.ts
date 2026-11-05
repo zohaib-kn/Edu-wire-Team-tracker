@@ -6,9 +6,15 @@ export interface Task {
   title: string
   note?: string
   team: string
+  teamId?: string
   branch: string
+  branchId?: string
   owner: string
+  ownerId?: string
+  reportingManager?: string
+  reportingManagerId?: string
   createdBy: string
+  createdById?: string
   due: string // YYYY-MM-DD
   priority: TaskPriority
   status: TaskStatus
@@ -54,6 +60,8 @@ export interface TaskFilterParams {
   branch?: string
   status?: TaskStatus | 'all'
   owner?: 'me' | string
+  reporting?: 'me' | string
+  reportingManager?: string
   due?: 'late' | 'today' | 'all'
   q?: string
   priority?: TaskPriority | 'all'
@@ -72,7 +80,9 @@ export interface TasksListResponse {
 export interface CreateTaskPayload {
   title: string
   team: string
+  branch?: string
   owner: string
+  reportingManager?: string
   due: string // YYYY-MM-DD
   priority: TaskPriority
   note?: string
@@ -82,6 +92,7 @@ export interface UpdateTaskPayload {
   title?: string
   note?: string
   owner?: string
+  reportingManager?: string
   due?: string // YYYY-MM-DD
   priority?: TaskPriority
 }
@@ -94,6 +105,10 @@ export interface TeamOption {
   id: string
   name: string
   branchId?: string
+  branch?: string
+  lead?: string
+  leadId?: string
+  leadName?: string
 }
 
 export interface BranchOption {
@@ -106,5 +121,6 @@ export interface TeamMemberOption {
   name: string
   email?: string
   teamId?: string
+  role?: string
 }
 

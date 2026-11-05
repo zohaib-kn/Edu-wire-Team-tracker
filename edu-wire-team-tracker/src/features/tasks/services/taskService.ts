@@ -45,6 +45,8 @@ export const taskService = {
     if (filters?.branch && filters.branch !== 'all') params.branch = filters.branch
     if (filters?.status && filters.status !== 'all') params.status = filters.status
     if (filters?.owner) params.owner = filters.owner
+    if (filters?.reporting) params.reporting = filters.reporting
+    if (filters?.reportingManager) params.reportingManager = filters.reportingManager
     if (filters?.due && filters.due !== 'all') params.due = filters.due
     if (filters?.q && filters.q.trim()) params.q = filters.q.trim()
     if (filters?.page) params.page = filters.page
