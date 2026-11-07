@@ -8,9 +8,9 @@ import { BranchesTable } from '@/features/organization/components/BranchesTable'
 import { BranchFormSheet } from '@/features/organization/components/BranchFormSheet'
 import { TeamsTable } from '@/features/organization/components/TeamsTable'
 import { TeamFormSheet } from '@/features/organization/components/TeamFormSheet'
-import { PageHeader } from '@/components/common/PageHeader'
 import { Button } from '@/components/ui/Button'
 import { Spinner } from '@/components/ui/Spinner'
+import { usePageHeader } from '@/context/HeaderContext'
 import { cn } from '@/lib/utils/cn'
 import type { BranchItem, TeamItem } from '@/features/organization/types/organization.types'
 
@@ -54,69 +54,69 @@ export function BranchesTeamsPage() {
   const branches = useMemo(() => branchesData || [], [branchesData])
   const teams = useMemo(() => teamsData || [], [teamsData])
 
+  // Top Header synchronization
+  usePageHeader({
+    title: 'Branches & Teams',
+    subtitle: 'Configure physical branch centers and functional operational teams',
+    actions: (
+      <div className="flex items-center gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            refetchBranches()
+            refetchTeams()
+          }}
+          leftIcon={<RefreshCw className="w-3.5 h-3.5" />}
+          aria-label="Refresh organizational structure"
+        >
+          <span className="hidden sm:inline">Refresh</span>
+        </Button>
+
+        {activeTab === 'branches' && canManageBranches && (
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => {
+              setBranchToEdit(null)
+              setIsBranchSheetOpen(true)
+            }}
+            leftIcon={<Plus className="w-4 h-4" />}
+          >
+            <span className="hidden sm:inline">Add Branch</span>
+          </Button>
+        )}
+
+        {activeTab === 'teams' && canManageTeams && (
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => {
+              setTeamToEdit(null)
+              setIsTeamSheetOpen(true)
+            }}
+            leftIcon={<Plus className="w-4 h-4" />}
+          >
+            <span className="hidden sm:inline">Create Team</span>
+          </Button>
+        )}
+      </div>
+    ),
+  })
+
   return (
     <div className="space-y-6">
-      {/* Page Header */}
-      <PageHeader
-        title="Branches & Teams"
-        description="Configure physical branch centers and functional operational teams"
-        actions={
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                refetchBranches()
-                refetchTeams()
-              }}
-              leftIcon={<RefreshCw className="w-3.5 h-3.5" />}
-              aria-label="Refresh organizational structure"
-            >
-              Refresh
-            </Button>
-
-            {activeTab === 'branches' && canManageBranches && (
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={() => {
-                  setBranchToEdit(null)
-                  setIsBranchSheetOpen(true)
-                }}
-                leftIcon={<Plus className="w-4 h-4" />}
-              >
-                Add Branch
-              </Button>
-            )}
-
-            {activeTab === 'teams' && canManageTeams && (
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={() => {
-                  setTeamToEdit(null)
-                  setIsTeamSheetOpen(true)
-                }}
-                leftIcon={<Plus className="w-4 h-4" />}
-              >
-                Create Team
-              </Button>
-            )}
-          </div>
-        }
-      />
-
-      {/* Tabs Switcher */}
-      <div className="flex items-center gap-2 border-b border-[#E2E8F0] pb-px text-xs font-semibold select-none">
+      {/* Pill-Style Tabs Switcher */}
+      <div className="flex items-center gap-2">
         {canManageBranches && (
           <button
             type="button"
             onClick={() => setActiveTab('branches')}
             className={cn(
-              'flex items-center gap-2 px-4 py-2.5 border-b-2 font-medium transition-colors cursor-pointer',
+              'flex items-center gap-2 px-4 py-2 rounded-full text-xs font-semibold transition-all cursor-pointer select-none border',
               activeTab === 'branches'
-                ? 'border-[#1D4ED8] text-[#1D4ED8] font-semibold'
-                : 'border-transparent text-slate-500 hover:text-slate-800',
+                ? 'bg-pill-dark text-white border-pill-dark shadow-xs'
+                : 'bg-surface text-text-muted border-border-subtle hover:bg-slate-50 hover:text-text-primary',
             )}
           >
             <Building2 className="w-4 h-4" />
@@ -129,10 +129,10 @@ export function BranchesTeamsPage() {
             type="button"
             onClick={() => setActiveTab('teams')}
             className={cn(
-              'flex items-center gap-2 px-4 py-2.5 border-b-2 font-medium transition-colors cursor-pointer',
+              'flex items-center gap-2 px-4 py-2 rounded-full text-xs font-semibold transition-all cursor-pointer select-none border',
               activeTab === 'teams'
-                ? 'border-[#1D4ED8] text-[#1D4ED8] font-semibold'
-                : 'border-transparent text-slate-500 hover:text-slate-800',
+                ? 'bg-pill-dark text-white border-pill-dark shadow-xs'
+                : 'bg-surface text-text-muted border-border-subtle hover:bg-slate-50 hover:text-text-primary',
             )}
           >
             <Users className="w-4 h-4" />
@@ -145,14 +145,14 @@ export function BranchesTeamsPage() {
       {activeTab === 'branches' && canManageBranches && (
         <section aria-label="Branch Locations">
           {isBranchesLoading ? (
-            <div className="py-20 flex flex-col items-center justify-center text-slate-400">
-              <Spinner size="lg" className="text-[#1D4ED8] mb-3" />
-              <p className="text-sm">Loading branch records...</p>
+            <div className="py-20 flex flex-col items-center justify-center text-text-muted">
+              <Spinner size="lg" className="text-brand-blue mb-3" />
+              <p className="text-sm font-medium">Loading branch records...</p>
             </div>
           ) : isBranchesError ? (
-            <div className="rounded-xl border border-dashed border-red-200 bg-red-50/50 p-8 text-center text-sm text-red-800">
+            <div className="rounded-card border border-dashed border-tint-red-border bg-tint-red-bg/50 p-8 text-center text-sm text-tint-red-text">
               <p className="font-semibold mb-1">Failed to load branches</p>
-              <p className="text-xs text-red-600 mb-4">
+              <p className="text-xs text-destructive mb-4">
                 The branch service is currently unreachable.
               </p>
               <Button variant="outline" size="sm" onClick={() => refetchBranches()}>
@@ -176,14 +176,14 @@ export function BranchesTeamsPage() {
       {activeTab === 'teams' && canManageTeams && (
         <section aria-label="Functional Teams">
           {isTeamsLoading ? (
-            <div className="py-20 flex flex-col items-center justify-center text-slate-400">
-              <Spinner size="lg" className="text-[#1D4ED8] mb-3" />
-              <p className="text-sm">Loading team records...</p>
+            <div className="py-20 flex flex-col items-center justify-center text-text-muted">
+              <Spinner size="lg" className="text-brand-blue mb-3" />
+              <p className="text-sm font-medium">Loading team records...</p>
             </div>
           ) : isTeamsError ? (
-            <div className="rounded-xl border border-dashed border-red-200 bg-red-50/50 p-8 text-center text-sm text-red-800">
+            <div className="rounded-card border border-dashed border-tint-red-border bg-tint-red-bg/50 p-8 text-center text-sm text-tint-red-text">
               <p className="font-semibold mb-1">Failed to load teams</p>
-              <p className="text-xs text-red-600 mb-4">
+              <p className="text-xs text-destructive mb-4">
                 The team service is currently unreachable.
               </p>
               <Button variant="outline" size="sm" onClick={() => refetchTeams()}>
@@ -219,4 +219,3 @@ export function BranchesTeamsPage() {
     </div>
   )
 }
-

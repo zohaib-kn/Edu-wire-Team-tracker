@@ -91,11 +91,11 @@ const MATRIX_PERMISSIONS_CATALOG: MatrixPermissionItem[] = [
 ]
 
 const SCOPE_LABELS: Record<MatrixScope, { label: string; badgeClasses: string }> = {
-  none: { label: 'None', badgeClasses: 'text-slate-400 bg-slate-50' },
-  own: { label: 'Own', badgeClasses: 'text-slate-700 bg-slate-100 font-medium' },
-  team: { label: 'Team', badgeClasses: 'text-blue-700 bg-blue-50 font-medium' },
-  branch: { label: 'Branch', badgeClasses: 'text-amber-700 bg-amber-50 font-medium' },
-  all: { label: 'All (Org)', badgeClasses: 'text-emerald-700 bg-emerald-50 font-semibold' },
+  none: { label: 'None', badgeClasses: 'text-text-muted/60 bg-slate-100' },
+  own: { label: 'Own', badgeClasses: 'text-text-primary bg-slate-200/70 font-medium' },
+  team: { label: 'Team', badgeClasses: 'text-brand-blue bg-tint-blue-bg font-semibold' },
+  branch: { label: 'Branch', badgeClasses: 'text-tint-amber-text bg-tint-amber-bg font-semibold' },
+  all: { label: 'All (Org)', badgeClasses: 'text-tint-green-text bg-tint-green-bg font-bold' },
 }
 
 export function RolePermissionMatrix({
@@ -122,39 +122,39 @@ export function RolePermissionMatrix({
   }
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-[#E2E8F0] bg-white shadow-xs">
+    <div className="overflow-x-auto rounded-card border border-border-subtle bg-surface shadow-card">
       <table className="w-full text-left text-xs border-collapse">
-        <thead className="bg-slate-50/75 border-b border-[#E2E8F0] text-[11px] font-semibold uppercase tracking-wider text-slate-500 select-none">
+        <thead className="bg-slate-50/75 border-b border-border-subtle text-[11px] font-semibold uppercase tracking-wider text-text-muted select-none">
           <tr>
-            <th className="px-4 py-3 min-w-[200px]">Permission</th>
-            <th className="px-4 py-3 min-w-[240px]">Description</th>
-            <th className="px-4 py-3 text-right min-w-[220px]">Authorized Scope</th>
+            <th className="px-5 py-3.5 min-w-[200px]">Permission</th>
+            <th className="px-5 py-3.5 min-w-[240px]">Description</th>
+            <th className="px-5 py-3.5 text-right min-w-[220px]">Authorized Scope</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-[#E2E8F0]">
+        <tbody className="divide-y divide-border-subtle/60">
           {MATRIX_PERMISSIONS_CATALOG.map((item) => {
             const currentScope = getSelectedScope(item.key)
 
             return (
-              <tr key={item.key} className="hover:bg-slate-50/50 transition-colors">
+              <tr key={item.key} className="hover:bg-slate-50/60 transition-colors">
                 {/* Permission Name */}
-                <td className="px-4 py-3 font-semibold text-slate-900">
+                <td className="px-5 py-4 font-semibold text-text-primary">
                   <div className="flex items-center gap-2">
                     <span>{item.label}</span>
-                    <span className="font-mono text-[10px] text-slate-400 font-normal">
+                    <span className="font-mono text-[10px] text-text-muted font-normal">
                       ({item.key})
                     </span>
                   </div>
                 </td>
 
                 {/* Description */}
-                <td className="px-4 py-3 text-slate-500 text-[11px] leading-relaxed">
+                <td className="px-5 py-4 text-text-muted text-[11px] leading-relaxed">
                   {item.description}
                 </td>
 
                 {/* Scope Selection */}
-                <td className="px-4 py-3 text-right">
-                  <div className="inline-flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+                <td className="px-5 py-4 text-right">
+                  <div className="inline-flex items-center gap-1 bg-slate-100/80 p-0.5 rounded-inner border border-border-subtle">
                     {item.allowedScopes.map((scope) => {
                       const isSelected = currentScope === scope
                       const meta = SCOPE_LABELS[scope]
@@ -166,14 +166,14 @@ export function RolePermissionMatrix({
                           disabled={disabled}
                           onClick={() => handleScopeChange(item.key, scope)}
                           className={cn(
-                            'px-2.5 py-1 text-[11px] rounded-md transition-all cursor-pointer',
+                            'px-2.5 py-1 text-[11px] rounded-nav transition-all cursor-pointer',
                             isSelected
-                              ? 'bg-white shadow-xs font-semibold text-[#0F172A]'
-                              : 'text-slate-500 hover:text-slate-800 disabled:cursor-not-allowed',
+                              ? 'bg-surface shadow-xs font-semibold text-text-primary'
+                              : 'text-text-muted hover:text-text-primary disabled:cursor-not-allowed',
                             disabled && 'cursor-not-allowed opacity-60',
                           )}
                         >
-                          <span className={cn('px-1 py-0.5 rounded', isSelected && meta.badgeClasses)}>
+                          <span className={cn('px-1.5 py-0.5 rounded-badge', isSelected && meta.badgeClasses)}>
                             {meta.label}
                           </span>
                         </button>

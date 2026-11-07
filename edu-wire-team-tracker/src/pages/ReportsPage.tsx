@@ -1,6 +1,5 @@
 import { useSearchParams } from 'react-router-dom'
 import { FileText, BarChart3, RefreshCw, Clock } from 'lucide-react'
-import { PageHeader } from '@/components/common/PageHeader'
 import { Button } from '@/components/ui/Button'
 import { ReportsFilterBar } from '@/features/reports/components/ReportsFilterBar'
 import { DailyPendingReport } from '@/features/reports/components/DailyPendingReport'
@@ -8,6 +7,7 @@ import { WeeklyPerformanceReport } from '@/features/reports/components/WeeklyPer
 import { useDailyReport } from '@/features/reports/hooks/useDailyReport'
 import { useWeeklyReport } from '@/features/reports/hooks/useWeeklyReport'
 import { getCurrentReportingDateContext } from '@/features/reports/utils/reportUtils'
+import { usePageHeader } from '@/context/HeaderContext'
 import type { ReportTab, ReportFilterParams } from '@/features/reports/types/report.types'
 import { cn } from '@/lib/utils/cn'
 
@@ -78,47 +78,47 @@ export function ReportsPage() {
 
   const dateContext = getCurrentReportingDateContext()
 
+  // Connect actions to Header.tsx
+  usePageHeader({
+    title: 'Reports',
+    subtitle: 'Monitor daily pending work and weekly team performance',
+    actions: (
+      <div className="flex items-center gap-2">
+        <div className="hidden sm:flex items-center gap-1.5 text-xs text-text-muted bg-surface border border-border-subtle px-3 py-1.5 rounded-nav shadow-xs">
+          <Clock className="w-3.5 h-3.5 text-text-muted/70" />
+          <span>{dateContext}</span>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleRefresh}
+          isLoading={isFetching}
+          leftIcon={<RefreshCw className="w-3.5 h-3.5" />}
+        >
+          <span className="hidden sm:inline">Refresh</span>
+        </Button>
+      </div>
+    ),
+  })
+
   return (
     <div className="space-y-6">
-      {/* Page Header */}
-      <PageHeader
-        title="Reports"
-        description="Monitor daily pending work and weekly team performance."
-        actions={
-          <div className="flex items-center gap-3">
-            <div className="hidden sm:flex items-center gap-1.5 text-xs text-slate-500 bg-white border border-[#E2E8F0] px-3 py-1.5 rounded-lg shadow-2xs">
-              <Clock className="w-3.5 h-3.5 text-slate-400" />
-              <span>{dateContext}</span>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleRefresh}
-              isLoading={isFetching}
-              leftIcon={<RefreshCw className="w-3.5 h-3.5" />}
-            >
-              Refresh
-            </Button>
-          </div>
-        }
-      />
-
       {/* Date context on mobile */}
-      <div className="sm:hidden flex items-center gap-1.5 text-xs text-slate-500 bg-white border border-[#E2E8F0] px-3 py-1.5 rounded-lg">
-        <Clock className="w-3.5 h-3.5 text-slate-400" />
+      <div className="sm:hidden flex items-center gap-1.5 text-xs text-text-muted bg-surface border border-border-subtle px-3.5 py-2 rounded-inner">
+        <Clock className="w-3.5 h-3.5 text-text-muted/70" />
         <span>{dateContext}</span>
       </div>
 
-      {/* Report Tabs */}
-      <div className="flex items-center gap-2 border-b border-[#E2E8F0] pb-2">
+      {/* Pill-style Report Tabs */}
+      <div className="flex items-center gap-2">
         <button
           type="button"
           onClick={() => handleTabChange('daily')}
           className={cn(
-            'inline-flex items-center gap-2 px-3.5 py-2 text-xs sm:text-sm font-medium rounded-lg transition-all cursor-pointer select-none',
+            'inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-full transition-all cursor-pointer select-none border',
             currentTab === 'daily'
-              ? 'bg-[#1D4ED8] text-white shadow-xs'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80',
+              ? 'bg-pill-dark text-white border-pill-dark shadow-xs'
+              : 'bg-surface text-text-muted border-border-subtle hover:bg-slate-50 hover:text-text-primary',
           )}
         >
           <FileText className="w-4 h-4" />
@@ -129,10 +129,10 @@ export function ReportsPage() {
           type="button"
           onClick={() => handleTabChange('weekly')}
           className={cn(
-            'inline-flex items-center gap-2 px-3.5 py-2 text-xs sm:text-sm font-medium rounded-lg transition-all cursor-pointer select-none',
+            'inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-full transition-all cursor-pointer select-none border',
             currentTab === 'weekly'
-              ? 'bg-[#1D4ED8] text-white shadow-xs'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80',
+              ? 'bg-pill-dark text-white border-pill-dark shadow-xs'
+              : 'bg-surface text-text-muted border-border-subtle hover:bg-slate-50 hover:text-text-primary',
           )}
         >
           <BarChart3 className="w-4 h-4" />
@@ -167,4 +167,3 @@ export function ReportsPage() {
     </div>
   )
 }
-

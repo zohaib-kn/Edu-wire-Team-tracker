@@ -1,5 +1,4 @@
-import { AlertTriangle, Calendar, Clock, CheckCircle2 } from 'lucide-react'
-import { Card, CardContent } from '@/components/ui/Card'
+import { Calendar, Clock, CheckCircle2, AlertTriangle } from 'lucide-react'
 import { Spinner } from '@/components/ui/Spinner'
 import type { TaskSummary } from '../types/task.types'
 
@@ -17,95 +16,105 @@ export function SummaryCards({
   const cards = [
     {
       id: 'late',
-      title: 'Late',
+      title: 'Late Tasks',
       description: 'Overdue incomplete tasks',
       count: summary?.late ?? 0,
       icon: AlertTriangle,
-      colorClass: 'text-[#DC2626]',
-      bgClass: 'bg-red-50 text-[#DC2626] border-red-100',
-      borderClass: 'border-l-4 border-l-[#DC2626]',
+      tint: {
+        cardBorder: 'border-tint-red-border/70',
+        iconBg: 'bg-tint-red-bg border-tint-red-border text-tint-red-text',
+        countColor: 'text-tint-red-text',
+      },
     },
     {
       id: 'today',
-      title: 'Today',
-      description: 'Incomplete tasks due today',
+      title: 'Due Today',
+      description: 'Tasks due today',
       count: summary?.today ?? 0,
       icon: Calendar,
-      colorClass: 'text-[#1D4ED8]',
-      bgClass: 'bg-blue-50 text-[#1D4ED8] border-blue-100',
-      borderClass: 'border-l-4 border-l-[#1D4ED8]',
+      tint: {
+        cardBorder: 'border-tint-blue-border/70',
+        iconBg: 'bg-tint-blue-bg border-tint-blue-border text-tint-blue-text',
+        countColor: 'text-tint-blue-text',
+      },
     },
     {
       id: 'pending',
       title: 'Pending',
-      description: 'Total active tasks to do',
+      description: 'Total active tasks',
       count: summary?.pending ?? 0,
       icon: Clock,
-      colorClass: 'text-slate-700',
-      bgClass: 'bg-slate-100 text-slate-700 border-slate-200',
-      borderClass: 'border-l-4 border-l-slate-400',
+      tint: {
+        cardBorder: 'border-tint-amber-border/70',
+        iconBg: 'bg-tint-amber-bg border-tint-amber-border text-tint-amber-text',
+        countColor: 'text-tint-amber-text',
+      },
     },
     {
       id: 'done7Days',
-      title: 'Done (7 days)',
-      description: 'Completed in the last 7 days',
+      title: 'Completed (7 days)',
+      description: 'Tasks completed in last 7 days',
       count: summary?.done7Days ?? 0,
       icon: CheckCircle2,
-      colorClass: 'text-[#16A34A]',
-      bgClass: 'bg-green-50 text-[#16A34A] border-green-100',
-      borderClass: 'border-l-4 border-l-[#16A34A]',
+      tint: {
+        cardBorder: 'border-tint-green-border/70',
+        iconBg: 'bg-tint-green-bg border-tint-green-border text-tint-green-text',
+        countColor: 'text-tint-green-text',
+      },
     },
   ]
 
   if (isError) {
     return (
-      <div className="rounded-xl border border-dashed border-red-200 bg-red-50/50 p-4 text-xs text-red-700">
+      <div className="rounded-card border border-dashed border-tint-red-border bg-tint-red-bg/50 p-4 text-xs text-tint-red-text">
         Summary metrics are currently unavailable from the server.
       </div>
     )
   }
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       {cards.map((card) => {
         const Icon = card.icon
         return (
-          <Card
+          <div
             key={card.id}
-            className={`shadow-xs transition-shadow hover:shadow-sm ${card.borderClass}`}
+            className={`rounded-card bg-surface border ${card.tint.cardBorder} p-5 shadow-card hover:shadow-card-hover transition-all flex items-center gap-4`}
           >
-            <CardContent className="p-4 sm:p-5">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-xs sm:text-sm font-medium text-slate-600">
-                  {card.title}
-                </span>
-                <div
-                  className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center border ${card.bgClass}`}
-                >
-                  <Icon className="w-4 h-4" />
-                </div>
-              </div>
+            {/* Left: Icon Tile */}
+            <div
+              className={`w-12 h-12 rounded-inner flex items-center justify-center border shrink-0 ${card.tint.iconBg}`}
+            >
+              <Icon className="w-5 h-5" strokeWidth={1.75} />
+            </div>
 
-              <div className="mt-2 flex items-baseline justify-between">
+            {/* Right: Label, Metric Count & Caption */}
+            <div className="flex flex-col min-w-0">
+              <span className="text-xs font-medium text-text-muted truncate">
+                {card.title}
+              </span>
+
+              <div className="mt-0.5 flex items-baseline">
                 {isLoading ? (
                   <div className="py-1">
-                    <Spinner size="sm" className="text-slate-400" />
+                    <Spinner size="sm" className="text-text-muted" />
                   </div>
                 ) : (
-                  <span className={`text-2xl sm:text-3xl font-bold tracking-tight ${card.colorClass}`}>
+                  <span
+                    className={`text-3xl font-bold tracking-tight ${card.tint.countColor}`}
+                  >
                     {card.count}
                   </span>
                 )}
               </div>
 
-              <p className="mt-1 text-[11px] text-slate-400 truncate">
+              <span className="text-[11px] text-text-muted/80 truncate mt-0.5">
                 {card.description}
-              </p>
-            </CardContent>
-          </Card>
+              </span>
+            </div>
+          </div>
         )
       })}
     </div>
   )
 }
-

@@ -1,6 +1,6 @@
-import { useState, useMemo } from 'react'
+import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Plus, Search, RefreshCw, ChevronLeft, ChevronRight, Filter } from 'lucide-react'
+import { Plus, Search, RefreshCw, Filter } from 'lucide-react'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { useUsers } from '@/features/users/hooks/useUsers'
 import { useBranches } from '@/features/tasks/hooks/useMetadata'
@@ -8,11 +8,12 @@ import { UsersTable } from '@/features/users/components/UsersTable'
 import { UserFormSheet } from '@/features/users/components/UserFormSheet'
 import { ResetPasswordDialog } from '@/features/users/components/ResetPasswordDialog'
 import { DeactivateUserDialog } from '@/features/users/components/DeactivateUserDialog'
-import { PageHeader } from '@/components/common/PageHeader'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Spinner } from '@/components/ui/Spinner'
+import { Pagination } from '@/components/ui/Pagination'
+import { usePageHeader } from '@/context/HeaderContext'
 import type { ManagedUser } from '@/features/users/types/userAdmin.types'
 
 export function UsersPage() {
@@ -68,61 +69,61 @@ export function UsersPage() {
     })
   }
 
-  const rawUsers = useMemo(() => usersData?.users || [], [usersData?.users])
-  const totalUsers = usersData?.total ?? rawUsers.length
-  const totalPages = Math.ceil(totalUsers / limit) || 1
-
   const handleOpenCreate = () => {
     setUserToEdit(null)
     setIsSheetOpen(true)
   }
 
-  const handleOpenEdit = (user: ManagedUser) => {
-    setUserToEdit(user)
+  const handleOpenEdit = (targetUser: ManagedUser) => {
+    setUserToEdit(targetUser)
     setIsSheetOpen(true)
   }
 
+  const rawUsers = usersData?.users || []
+  const totalUsers = usersData?.total ?? rawUsers.length
+  const totalPages = Math.ceil(totalUsers / limit) || 1
+
+  // Top Header synchronization
+  usePageHeader({
+    title: 'Users',
+    subtitle: 'Manage staff accounts, credentials, and roles',
+    actions: (
+      <div className="flex items-center gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => refetch()}
+          leftIcon={<RefreshCw className="w-3.5 h-3.5" />}
+          aria-label="Refresh user list"
+        >
+          <span className="hidden sm:inline">Refresh</span>
+        </Button>
+        <Button
+          variant="primary"
+          size="sm"
+          onClick={handleOpenCreate}
+          leftIcon={<Plus className="w-4 h-4" />}
+        >
+          <span className="hidden sm:inline">Add User</span>
+        </Button>
+      </div>
+    ),
+  })
+
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <PageHeader
-        title="Users"
-        description="Manage staff accounts, credentials, and organizational access"
-        actions={
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => refetch()}
-              leftIcon={<RefreshCw className="w-3.5 h-3.5" />}
-              aria-label="Refresh user list"
-            >
-              Refresh
-            </Button>
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={handleOpenCreate}
-              leftIcon={<Plus className="w-4 h-4" />}
-            >
-              Add User
-            </Button>
-          </div>
-        }
-      />
-
-      {/* Filter Toolbar */}
-      <div className="bg-white border border-[#E2E8F0] rounded-xl p-4 shadow-xs space-y-3">
+      {/* Search & Filter Toolbar */}
+      <div className="bg-surface border border-border-subtle rounded-card p-4 shadow-card space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          {/* Search */}
+          {/* Search by Name/Email */}
           <div className="sm:col-span-2 lg:col-span-1">
             <Input
-              id="search-users"
+              id="users-search"
               type="search"
               placeholder="Search by name or email..."
               value={searchQuery}
               onChange={(e) => updateFilter('q', e.target.value)}
-              leftIcon={<Search className="w-4 h-4 text-slate-400" />}
+              leftIcon={<Search className="w-4 h-4 text-text-muted" />}
             />
           </div>
 
@@ -130,13 +131,13 @@ export function UsersPage() {
           {showBranchFilter && (
             <div>
               <Select
-                id="filter-branch"
+                id="users-branch"
                 value={branchFilter}
                 onChange={(e) => updateFilter('branch', e.target.value)}
               >
                 <option value="all">All Branches</option>
                 {branches.map((b) => (
-                  <option key={b.id} value={b.name || b.id}>
+                  <option key={b.id} value={b.name}>
                     {b.name}
                   </option>
                 ))}
@@ -147,7 +148,7 @@ export function UsersPage() {
           {/* Role Filter */}
           <div>
             <Select
-              id="filter-role"
+              id="users-role"
               value={roleFilter}
               onChange={(e) => updateFilter('role', e.target.value)}
             >
@@ -162,43 +163,43 @@ export function UsersPage() {
           {/* Status Filter */}
           <div>
             <Select
-              id="filter-status"
+              id="users-status"
               value={statusFilter}
               onChange={(e) => updateFilter('status', e.target.value)}
             >
-              <option value="all">All Account Statuses</option>
-              <option value="active">Active Only</option>
-              <option value="inactive">Inactive Only</option>
+              <option value="all">All Statuses</option>
+              <option value="active">Active Accounts</option>
+              <option value="inactive">Inactive / Suspended</option>
             </Select>
           </div>
         </div>
 
-        {/* Clear filters banner */}
+        {/* Active Filter Indicators */}
         {(searchQuery || branchFilter !== 'all' || roleFilter !== 'all' || statusFilter !== 'all') && (
-          <div className="flex items-center gap-2 pt-2 border-t border-slate-100 text-xs text-slate-500">
+          <div className="flex items-center gap-2 pt-2 border-t border-border-subtle/50 text-xs text-text-muted">
             <Filter className="w-3.5 h-3.5" />
-            <span>Filters active</span>
+            <span>Active filters applied</span>
             <button
               type="button"
               onClick={() => setSearchParams(new URLSearchParams())}
-              className="text-[#1D4ED8] hover:underline font-medium ml-2 cursor-pointer"
+              className="text-brand-blue hover:underline font-semibold ml-2 cursor-pointer"
             >
-              Reset all filters
+              Clear all
             </button>
           </div>
         )}
       </div>
 
-      {/* Users Table / Content */}
+      {/* Users Listing Table */}
       {isLoading ? (
-        <div className="py-20 flex flex-col items-center justify-center text-slate-400">
-          <Spinner size="lg" className="text-[#1D4ED8] mb-3" />
-          <p className="text-sm">Loading staff accounts...</p>
+        <div className="py-20 flex flex-col items-center justify-center text-text-muted">
+          <Spinner size="lg" className="text-brand-blue mb-3" />
+          <p className="text-sm font-medium">Loading user accounts...</p>
         </div>
       ) : isError ? (
-        <div className="rounded-xl border border-dashed border-red-200 bg-red-50/50 p-8 text-center text-sm text-red-800">
+        <div className="rounded-card border border-dashed border-tint-red-border bg-tint-red-bg/50 p-8 text-center text-sm text-tint-red-text">
           <p className="font-semibold mb-1">Failed to load staff accounts</p>
-          <p className="text-xs text-red-600 mb-4">
+          <p className="text-xs text-destructive mb-4">
             Could not communicate with the user management API endpoint.
           </p>
           <Button variant="outline" size="sm" onClick={() => refetch()}>
@@ -215,33 +216,13 @@ export function UsersPage() {
           />
 
           {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between border-t border-[#E2E8F0] pt-4 px-2">
-              <span className="text-xs text-slate-500">
-                Page {currentPage} of {totalPages} ({totalUsers} total staff members)
-              </span>
-              <div className="flex items-center gap-1.5">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={currentPage <= 1}
-                  onClick={() => updateFilter('page', String(currentPage - 1))}
-                  leftIcon={<ChevronLeft className="w-4 h-4" />}
-                >
-                  Previous
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={currentPage >= totalPages}
-                  onClick={() => updateFilter('page', String(currentPage + 1))}
-                  rightIcon={<ChevronRight className="w-4 h-4" />}
-                >
-                  Next
-                </Button>
-              </div>
-            </div>
-          )}
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalUsers}
+            itemName="staff members"
+            onPageChange={(page) => updateFilter('page', String(page))}
+          />
         </div>
       )}
 
@@ -268,4 +249,3 @@ export function UsersPage() {
     </div>
   )
 }
-

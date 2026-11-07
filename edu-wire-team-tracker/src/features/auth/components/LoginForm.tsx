@@ -8,7 +8,11 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Alert } from '@/components/ui/Alert'
 
-export function LoginForm() {
+export interface LoginFormProps {
+  isDark?: boolean
+}
+
+export function LoginForm({ isDark = false }: LoginFormProps = {}) {
   const { login } = useAuth()
   const [formError, setFormError] = useState<string | null>(null)
 
@@ -43,7 +47,7 @@ export function LoginForm() {
     <form
       onSubmit={handleSubmit(onSubmit)}
       noValidate
-      className="space-y-4"
+      className="space-y-5"
     >
       {formError && (
         <Alert variant="error" title="Sign In Failed">
@@ -64,6 +68,7 @@ export function LoginForm() {
           leftIcon={<Mail className="w-4 h-4" />}
           error={errors.email?.message}
           disabled={isSubmitting}
+          isDark={isDark}
         />
       </div>
 
@@ -80,10 +85,11 @@ export function LoginForm() {
           leftIcon={<Lock className="w-4 h-4" />}
           error={errors.password?.message}
           disabled={isSubmitting}
+          isDark={isDark}
         />
       </div>
 
-      <div className="pt-2">
+      <div className="pt-1.5">
         <Button
           type="submit"
           fullWidth
@@ -93,12 +99,6 @@ export function LoginForm() {
         >
           {isSubmitting ? 'Signing In...' : 'Sign In'}
         </Button>
-      </div>
-
-      <div className="pt-2 text-center">
-        <p className="text-xs text-slate-500">
-          Account credentials are provided by your administrator. Contact your team lead or IT support if you cannot sign in.
-        </p>
       </div>
     </form>
   )

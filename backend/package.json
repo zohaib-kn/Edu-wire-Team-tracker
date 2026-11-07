@@ -13,18 +13,25 @@
     "test:auth": "tsx src/scripts/test-auth.ts",
     "test:tasks": "tsx src/scripts/test-tasks.ts",
     "test:phase4": "tsx src/scripts/test-phase4.ts",
-    "test:reporting-manager": "tsx src/scripts/test-reporting-manager.ts"
+    "test:reporting-manager": "tsx src/scripts/test-reporting-manager.ts",
+    "test:phase5-part1": "tsx src/scripts/test-phase5-part1.ts",
+    "test:phase5-part2": "tsx src/scripts/test-phase5-part2.ts",
+    "test:phase5-part3": "tsx src/scripts/test-phase5-part3.ts",
+    "workers": "tsx src/workers/index.ts"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
     "bcrypt": "^6.0.0",
+    "bullmq": "^6.7.1",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
     "dotenv": "^18.0.9",
+    "expo-server-sdk": "^8.0.0",
     "express": "^5.3.0",
     "helmet": "^8.3.0",
+    "ioredis": "^5.11.1",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.12.0",
     "zod": "^4.6.7"
@@ -36,6 +43,7 @@
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^26.6.6",
+    "ioredis-mock": "^8.13.1",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2"
   }

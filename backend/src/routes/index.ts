@@ -8,6 +8,8 @@ import { branchRouter } from '../modules/branches/branch.routes.js'
 import { teamRouter } from '../modules/teams/team.routes.js'
 import { roleRouter } from '../modules/roles/role.routes.js'
 import { reportRouter } from '../modules/reports/report.routes.js'
+import { deviceRouter } from '../modules/devices/device.routes.js'
+import { notificationRouter } from '../modules/notifications/notification.routes.js'
 
 export const apiRouter = Router()
 
@@ -37,3 +39,9 @@ apiRouter.use('/roles', roleRouter)
 
 // Reports & analytics endpoints: /api/v1/reports/*
 apiRouter.use('/reports', reportRouter)
+
+// Push device tokens endpoints: /api/v1/devices/*
+apiRouter.use('/devices', deviceRouter)
+
+// In-app web notification endpoints: /api/v1/notifications/*
+apiRouter.use('/notifications', notificationRouter)

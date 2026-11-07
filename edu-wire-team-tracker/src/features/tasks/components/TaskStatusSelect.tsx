@@ -19,18 +19,18 @@ const statusConfig: Record<
 > = {
   todo: {
     label: 'To Do',
-    badgeClasses: 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200/70',
-    dotClasses: 'bg-slate-400',
+    badgeClasses: 'bg-tint-blue-bg text-tint-blue-text border-tint-blue-border hover:bg-tint-blue-bg/80',
+    dotClasses: 'bg-brand-blue',
   },
   doing: {
     label: 'In Progress',
-    badgeClasses: 'bg-blue-50 text-[#1D4ED8] border-blue-200 hover:bg-blue-100/70',
-    dotClasses: 'bg-[#1D4ED8]',
+    badgeClasses: 'bg-tint-amber-bg text-tint-amber-text border-tint-amber-border hover:bg-tint-amber-bg/80',
+    dotClasses: 'bg-amber-600',
   },
   done: {
-    label: 'Done',
-    badgeClasses: 'bg-green-50 text-[#16A34A] border-green-200 hover:bg-green-100/70',
-    dotClasses: 'bg-[#16A34A]',
+    label: 'Completed',
+    badgeClasses: 'bg-tint-green-bg text-tint-green-text border-tint-green-border hover:bg-tint-green-bg/80',
+    dotClasses: 'bg-[#15803D]',
   },
 }
 
@@ -63,8 +63,8 @@ export function TaskStatusSelect({
     return (
       <span
         className={cn(
-          'inline-flex items-center gap-1.5 rounded-md font-medium border select-none',
-          size === 'sm' ? 'px-2 py-0.5 text-xs' : 'px-2.5 py-1 text-sm',
+          'inline-flex items-center gap-1.5 rounded-badge font-semibold border select-none',
+          size === 'sm' ? 'px-2 py-0.5 text-[11px]' : 'px-2.5 py-1 text-xs',
           current.badgeClasses,
         )}
       >
@@ -87,8 +87,8 @@ export function TaskStatusSelect({
         aria-expanded={isOpen}
         aria-label={`Change task status, current: ${current.label}`}
         className={cn(
-          'inline-flex items-center gap-1.5 rounded-md font-medium border transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#1D4ED8]/30',
-          size === 'sm' ? 'px-2 py-0.5 text-xs' : 'px-2.5 py-1 text-sm',
+          'inline-flex items-center gap-1.5 rounded-badge font-semibold border transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-blue/20',
+          size === 'sm' ? 'px-2 py-0.5 text-[11px]' : 'px-2.5 py-1 text-xs',
           current.badgeClasses,
           isUpdating && 'opacity-70 cursor-wait',
         )}
@@ -114,7 +114,7 @@ export function TaskStatusSelect({
           <div
             role="listbox"
             onClick={(e) => e.stopPropagation()}
-            className="absolute left-0 mt-1 w-36 rounded-lg bg-white border border-[#E2E8F0] shadow-lg py-1 z-50 text-xs focus:outline-none"
+            className="absolute left-0 mt-1 w-36 rounded-card bg-surface border border-border-subtle shadow-dropdown py-1 z-50 text-xs focus:outline-none animate-in fade-in zoom-in-95 duration-100"
           >
             {(['todo', 'doing', 'done'] as TaskStatus[]).map((st) => {
               const cfg = statusConfig[st]
@@ -127,15 +127,15 @@ export function TaskStatusSelect({
                   aria-selected={isSelected}
                   onClick={() => handleSelect(st)}
                   className={cn(
-                    'w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50 transition-colors',
-                    isSelected && 'font-semibold text-[#0F172A]',
+                    'w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-slate-50 transition-colors cursor-pointer',
+                    isSelected && 'font-semibold text-text-primary bg-slate-50/70',
                   )}
                 >
                   <div className="flex items-center gap-2">
                     <span className={cn('w-2 h-2 rounded-full', cfg.dotClasses)} />
                     <span>{cfg.label}</span>
                   </div>
-                  {isSelected && <Check className="w-3.5 h-3.5 text-[#1D4ED8]" />}
+                  {isSelected && <Check className="w-3.5 h-3.5 text-brand-blue" />}
                 </button>
               )
             })}
@@ -145,4 +145,3 @@ export function TaskStatusSelect({
     </div>
   )
 }
-

@@ -62,20 +62,20 @@ export function Modal({
       {/* Modal Dialog Card */}
       <div
         className={cn(
-          'relative z-10 w-full rounded-xl bg-white border border-[#E2E8F0] shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150',
+          'relative z-10 w-full rounded-card bg-surface border border-border-subtle shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150',
           maxWidthClasses[maxWidth],
         )}
       >
         {(title || description) && (
-          <div className="flex items-start justify-between border-b border-[#E2E8F0] px-5 py-4">
+          <div className="flex items-start justify-between border-b border-border-subtle px-6 py-5">
             <div>
               {title && (
-                <h3 className="text-base font-semibold text-[#0F172A] leading-tight">
+                <h3 className="text-base font-semibold text-text-primary leading-tight">
                   {title}
                 </h3>
               )}
               {description && (
-                <p className="mt-1 text-xs text-slate-500 leading-normal">
+                <p className="mt-1 text-xs text-text-muted leading-normal">
                   {description}
                 </p>
               )}
@@ -84,17 +84,17 @@ export function Modal({
               type="button"
               onClick={onClose}
               aria-label="Close dialog"
-              className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors focus:outline-none"
+              className="p-1.5 rounded-nav text-text-muted hover:text-text-primary hover:bg-slate-100 transition-colors focus:outline-none cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
           </div>
         )}
 
-        <div className="p-5">{children}</div>
+        <div className="p-6">{children}</div>
 
         {footer && (
-          <div className="flex items-center justify-end gap-2 border-t border-[#E2E8F0] bg-slate-50/50 px-5 py-3">
+          <div className="flex items-center justify-end gap-2.5 border-t border-border-subtle bg-slate-50/60 px-6 py-4">
             {footer}
           </div>
         )}
@@ -102,4 +102,3 @@ export function Modal({
     </div>
   )
 }
-

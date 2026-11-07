@@ -1,6 +1,7 @@
 import {
   LayoutDashboard,
   CheckSquare,
+  History,
   BarChart3,
   Users,
   Network,
@@ -39,6 +40,12 @@ export const NAVIGATION_CONFIG: NavSection[] = [
         label: 'My Tasks',
         path: '/my-tasks',
         icon: CheckSquare,
+      },
+      {
+        id: 'history',
+        label: 'Task History',
+        path: '/history',
+        icon: History,
       },
       {
         id: 'reports',

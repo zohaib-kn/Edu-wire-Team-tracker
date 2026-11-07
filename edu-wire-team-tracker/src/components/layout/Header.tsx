@@ -1,30 +1,91 @@
 import { useState, useRef, useEffect } from 'react'
-import { useLocation } from 'react-router-dom'
-import { Menu, LogOut, ChevronDown, User as UserIcon } from 'lucide-react'
+import { useLocation, Link } from 'react-router-dom'
+import { Menu, LogOut, ChevronDown, KeyRound, Shield } from 'lucide-react'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { Badge } from '@/components/ui/Badge'
+import { NotificationBell } from '@/features/notifications/components/NotificationBell'
+import { useHeader } from '@/context/HeaderContext'
 
 export interface HeaderProps {
   onOpenMobileMenu: () => void
 }
 
-function getPageTitle(pathname: string): string {
-  if (pathname === '/' || pathname === '/dashboard') return 'Dashboard'
-  if (pathname.startsWith('/my-tasks')) return 'My Tasks'
-  if (pathname.startsWith('/tasks/new')) return 'Create Task'
-  if (pathname.startsWith('/tasks/')) return 'Task Details'
-  if (pathname.startsWith('/reports')) return 'Reports'
-  if (pathname.startsWith('/users')) return 'Users'
-  if (pathname.startsWith('/branches-teams')) return 'Branches & Teams'
-  if (pathname.startsWith('/roles')) return 'Roles & Permissions'
-  if (pathname.startsWith('/change-password')) return 'Change Password'
-  return 'Edu Wire'
+function getDefaultHeader(pathname: string): { title: string; subtitle: string } {
+  if (pathname === '/' || pathname === '/dashboard') {
+    return {
+      title: 'Dashboard',
+      subtitle: "Overview of your team's tasks and progress",
+    }
+  }
+  if (pathname.startsWith('/my-tasks')) {
+    return {
+      title: 'My Tasks',
+      subtitle: 'Tasks assigned to you and awaiting your action',
+    }
+  }
+  if (pathname.startsWith('/history')) {
+    return {
+      title: 'Task History',
+      subtitle: 'Archived and completed task records',
+    }
+  }
+  if (pathname.startsWith('/tasks/new')) {
+    return {
+      title: 'Create Task',
+      subtitle: 'Create and assign a new team task',
+    }
+  }
+  if (pathname.startsWith('/tasks/')) {
+    return {
+      title: 'Task Details',
+      subtitle: 'Task details and progress tracking',
+    }
+  }
+  if (pathname.startsWith('/reports')) {
+    return {
+      title: 'Reports',
+      subtitle: 'Performance analytics and team reporting',
+    }
+  }
+  if (pathname.startsWith('/users')) {
+    return {
+      title: 'Users',
+      subtitle: 'Manage staff accounts, credentials, and roles',
+    }
+  }
+  if (pathname.startsWith('/branches-teams')) {
+    return {
+      title: 'Branches & Teams',
+      subtitle: 'Manage organization branches, centers, and teams',
+    }
+  }
+  if (pathname.startsWith('/roles')) {
+    return {
+      title: 'Roles & Permissions',
+      subtitle: 'Configure system roles and permission matrices',
+    }
+  }
+  if (pathname.startsWith('/change-password')) {
+    return {
+      title: 'Change Password',
+      subtitle: 'Update your account password',
+    }
+  }
+  return {
+    title: 'Edu Wire',
+    subtitle: 'Team Tracker',
+  }
 }
 
 export function Header({ onOpenMobileMenu }: HeaderProps) {
   const { user, logout } = useAuth()
   const location = useLocation()
-  const pageTitle = getPageTitle(location.pathname)
+  const pageHeaderConfig = useHeader()
+  const defaultHeader = getDefaultHeader(location.pathname)
+
+  const title = pageHeaderConfig.title || defaultHeader.title
+  const subtitle = pageHeaderConfig.subtitle || defaultHeader.subtitle
+  const actions = pageHeaderConfig.actions
 
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -55,91 +116,115 @@ export function Header({ onOpenMobileMenu }: HeaderProps) {
   const initials = getInitials(user?.name, user?.email)
 
   return (
-    <header className="h-16 px-4 sm:px-6 lg:px-8 bg-white border-b border-[#E2E8F0] flex items-center justify-between sticky top-0 z-30 shrink-0">
-      {/* Left: Mobile hamburger & Page Title */}
-      <div className="flex items-center gap-3">
+    <header className="h-18 px-6 sm:px-8 bg-surface border-b border-border-subtle flex items-center justify-between sticky top-0 z-30 shrink-0">
+      {/* Left: Mobile menu toggle + Page Title & Subtitle */}
+      <div className="flex items-center gap-3.5 min-w-0">
         <button
           type="button"
           onClick={onOpenMobileMenu}
           aria-label="Open mobile navigation"
-          className="lg:hidden p-2 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-[#1D4ED8]"
+          className="lg:hidden p-2 rounded-nav text-text-muted hover:text-text-primary hover:bg-slate-100 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-blue/20 cursor-pointer shrink-0"
         >
           <Menu className="w-5 h-5" />
         </button>
-        <h1 className="text-base sm:text-lg font-semibold text-[#0F172A] tracking-tight truncate">
-          {pageTitle}
-        </h1>
+
+        <div className="flex flex-col min-w-0">
+          <h1 className="text-xl sm:text-2xl font-bold text-text-primary tracking-tight leading-tight truncate">
+            {title}
+          </h1>
+          {subtitle && (
+            <p className="text-xs text-text-muted leading-tight mt-0.5 truncate hidden sm:block">
+              {subtitle}
+            </p>
+          )}
+        </div>
       </div>
 
-      {/* Right: User Profile Menu */}
-      <div className="relative" ref={menuRef}>
-        <button
-          type="button"
-          onClick={() => setIsMenuOpen((prev) => !prev)}
-          aria-expanded={isMenuOpen}
-          aria-haspopup="true"
-          className="flex items-center gap-2.5 p-1.5 rounded-lg hover:bg-slate-50 border border-transparent hover:border-[#E2E8F0] transition-colors focus:outline-none focus:ring-2 focus:ring-[#1D4ED8]/20"
-        >
-          <div className="w-8 h-8 rounded-full bg-blue-100 text-[#1D4ED8] font-semibold text-xs flex items-center justify-center shrink-0 border border-blue-200">
-            {initials}
-          </div>
-          <div className="hidden sm:flex flex-col text-left">
-            <span className="text-xs font-semibold text-[#0F172A] leading-tight">
-              {user?.name || user?.email || 'User'}
-            </span>
-            <span className="text-[11px] text-slate-500 leading-tight">
-              {user?.role || 'Member'}
-            </span>
-          </div>
-          <ChevronDown className="w-3.5 h-3.5 text-slate-400 hidden sm:block" />
-        </button>
-
-        {/* Dropdown Menu */}
-        {isMenuOpen && (
-          <div
-            role="menu"
-            aria-orientation="vertical"
-            className="absolute right-0 mt-2 w-56 rounded-xl bg-white border border-[#E2E8F0] shadow-lg py-1.5 z-40 text-left focus:outline-none"
-          >
-            <div className="px-3.5 py-2.5 border-b border-[#E2E8F0]">
-              <p className="text-xs font-semibold text-[#0F172A] truncate">
-                {user?.name || 'User'}
-              </p>
-              <p className="text-[11px] text-slate-500 truncate mt-0.5">
-                {user?.email}
-              </p>
-              <div className="mt-2">
-                <Badge variant="primary" size="sm">
-                  {user?.role || 'Member'}
-                </Badge>
-              </div>
-            </div>
-
-            <div className="py-1">
-              <div className="px-3.5 py-1.5 flex items-center gap-2 text-xs text-slate-500">
-                <UserIcon className="w-3.5 h-3.5 text-slate-400" />
-                <span>Account ID: {user?.id?.slice(0, 8) || 'N/A'}</span>
-              </div>
-            </div>
-
-            <div className="border-t border-[#E2E8F0] pt-1">
-              <button
-                type="button"
-                role="menuitem"
-                onClick={async () => {
-                  setIsMenuOpen(false)
-                  await logout()
-                }}
-                className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-[#DC2626] hover:bg-red-50/80 transition-colors"
-              >
-                <LogOut className="w-3.5 h-3.5" />
-                <span>Sign Out</span>
-              </button>
-            </div>
+      {/* Right: Actions cluster, Notification Bell & User Chip */}
+      <div className="flex items-center gap-3 shrink-0">
+        {/* Dynamic Page Action buttons (Back, Edit, Create, etc.) */}
+        {actions && (
+          <div className="flex items-center gap-2 max-w-[200px] sm:max-w-none overflow-x-auto">
+            {actions}
           </div>
         )}
+
+        {/* Notification Bell */}
+        <NotificationBell />
+
+        {/* User Chip & Dropdown */}
+        <div className="relative" ref={menuRef}>
+          <button
+            type="button"
+            onClick={() => setIsMenuOpen((prev) => !prev)}
+            aria-expanded={isMenuOpen}
+            aria-haspopup="true"
+            className="flex items-center gap-2.5 p-1 rounded-full sm:rounded-nav hover:bg-slate-50 border border-transparent hover:border-border-subtle transition-all focus:outline-none focus:ring-2 focus:ring-brand-blue/20 cursor-pointer"
+          >
+            <div className="w-9 h-9 rounded-full bg-brand-blue-light text-brand-blue-text font-bold text-xs flex items-center justify-center shrink-0 border border-blue-100 shadow-xs">
+              {initials}
+            </div>
+            <span className="hidden sm:inline text-sm font-semibold text-text-primary truncate max-w-[140px]">
+              {user?.name || user?.email || 'User'}
+            </span>
+            <ChevronDown className="w-3.5 h-3.5 text-text-muted hidden sm:block" />
+          </button>
+
+          {/* User Menu Dropdown */}
+          {isMenuOpen && (
+            <div
+              role="menu"
+              aria-orientation="vertical"
+              className="absolute right-0 mt-2 w-60 rounded-card bg-surface border border-border-subtle shadow-dropdown py-1.5 z-40 text-left focus:outline-none animate-in fade-in zoom-in-95 duration-150"
+            >
+              <div className="px-4 py-3 border-b border-border-subtle bg-slate-50/50">
+                <p className="text-xs font-semibold text-text-primary truncate">
+                  {user?.name || 'User'}
+                </p>
+                <p className="text-[11px] text-text-muted truncate mt-0.5">
+                  {user?.email}
+                </p>
+                <div className="mt-2">
+                  <Badge variant="primary" size="sm" className="text-[10px]">
+                    {user?.role || 'Member'}
+                  </Badge>
+                </div>
+              </div>
+
+              <div className="py-1">
+                <Link
+                  to="/change-password"
+                  onClick={() => setIsMenuOpen(false)}
+                  className="w-full flex items-center gap-2.5 px-4 py-2 text-xs font-medium text-text-muted hover:text-text-primary hover:bg-slate-50 transition-colors"
+                >
+                  <KeyRound className="w-4 h-4 text-text-muted" />
+                  <span>Change Password</span>
+                </Link>
+
+                <div className="px-4 py-1.5 flex items-center gap-2 text-xs text-text-muted/80">
+                  <Shield className="w-3.5 h-3.5 text-text-muted/60" />
+                  <span>ID: {user?.id?.slice(0, 8) || 'N/A'}</span>
+                </div>
+              </div>
+
+              <div className="border-t border-border-subtle pt-1">
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={async () => {
+                    setIsMenuOpen(false)
+                    await logout()
+                  }}
+                  className="w-full flex items-center gap-2.5 px-4 py-2 text-xs font-medium text-destructive hover:bg-tint-red-bg transition-colors cursor-pointer"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span>Sign Out</span>
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </header>
   )
 }
-

@@ -42,10 +42,10 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
         {label && (
           <label
             htmlFor={selectId}
-            className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5"
+            className="block text-xs font-semibold uppercase tracking-wider text-text-primary mb-1.5"
           >
             {label}
-            {props.required && <span className="text-[#DC2626] ml-1" aria-hidden="true">*</span>}
+            {props.required && <span className="text-destructive ml-1" aria-hidden="true">*</span>}
           </label>
         )}
 
@@ -58,11 +58,11 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
             aria-invalid={Boolean(error)}
             aria-describedby={error ? errorId : helperText ? helperId : undefined}
             className={cn(
-              'h-10 w-full rounded-lg bg-white pl-3 pr-10 text-sm text-[#0F172A]',
-              'border border-[#E2E8F0] shadow-xs transition-colors appearance-none cursor-pointer',
-              'focus:border-[#1D4ED8] focus:outline-none focus:ring-2 focus:ring-[#1D4ED8]/20',
-              'disabled:bg-slate-50 disabled:text-slate-400 disabled:cursor-not-allowed',
-              error && 'border-[#DC2626] focus:border-[#DC2626] focus:ring-[#DC2626]/20',
+              'h-10 w-full rounded-input bg-surface pl-3 pr-10 text-sm text-text-primary',
+              'border border-border-subtle shadow-card transition-colors appearance-none cursor-pointer',
+              'focus:border-brand-blue focus:outline-none focus:ring-2 focus:ring-brand-blue/20',
+              'disabled:bg-slate-50 disabled:text-text-muted disabled:cursor-not-allowed',
+              error && 'border-destructive focus:border-destructive focus:ring-destructive/20',
               className,
             )}
             {...props}
@@ -75,17 +75,17 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
                 ))
               : children}
           </select>
-          <div className="pointer-events-none absolute right-3 flex items-center text-slate-400">
+          <div className="pointer-events-none absolute right-3 flex items-center text-text-muted">
             <ChevronDown className="w-4 h-4" />
           </div>
         </div>
 
         {error ? (
-          <p id={errorId} role="alert" className="mt-1 text-xs text-[#DC2626]">
+          <p id={errorId} role="alert" className="mt-1 text-xs text-destructive">
             {error}
           </p>
         ) : helperText ? (
-          <p id={helperId} className="mt-1 text-xs text-slate-500">
+          <p id={helperId} className="mt-1 text-xs text-text-muted">
             {helperText}
           </p>
         ) : null}
@@ -95,4 +95,3 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
 )
 
 Select.displayName = 'Select'
-

@@ -22,6 +22,14 @@ const envSchema = z.object({
   JWT_REFRESH_SECRET: z
     .string()
     .min(16, 'JWT_REFRESH_SECRET must be at least 16 characters long'),
+  REDIS_HOST: z.string().default('127.0.0.1'),
+  REDIS_PORT: z.coerce.number().default(6379),
+  REDIS_PASSWORD: z.string().optional(),
+  REDIS_URL: z.string().optional(),
+  USE_MOCK_REDIS: z
+    .string()
+    .optional()
+    .transform((val) => val === 'true'),
 })
 
 export type Env = z.infer<typeof envSchema>

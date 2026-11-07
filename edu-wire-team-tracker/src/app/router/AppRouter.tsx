@@ -11,6 +11,7 @@ import { LoginPage } from '@/pages/LoginPage'
 import { ChangePasswordPage } from '@/pages/ChangePasswordPage'
 import { DashboardPage } from '@/pages/DashboardPage'
 import { MyTasksPage } from '@/pages/MyTasksPage'
+import { TaskHistoryPage } from '@/pages/TaskHistoryPage'
 import { CreateTaskPage } from '@/pages/CreateTaskPage'
 import { TaskDetailPage } from '@/pages/TaskDetailPage'
 import { ReportsPage } from '@/pages/ReportsPage'
@@ -61,6 +62,10 @@ const router = createBrowserRouter([
       {
         path: 'my-tasks',
         element: <MyTasksPage />,
+      },
+      {
+        path: 'history',
+        element: <TaskHistoryPage />,
       },
       {
         path: 'tasks/new',

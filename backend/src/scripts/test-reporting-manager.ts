@@ -7,6 +7,8 @@ import http from 'http'
 import mongoose from 'mongoose'
 import { app } from '../app.js'
 import { connectDatabase, disconnectDatabase } from '../config/database.js'
+import { setRedisMockMode, closeRedisConnections } from '../config/redis.js'
+import { closeAllQueues } from '../queues/queue.manager.js'
 import { User, type IUser } from '../models/User.js'
 import { Role } from '../models/Role.js'
 import { Branch } from '../models/Branch.js'
@@ -67,6 +69,7 @@ async function request(path: string, options: {
 async function runTests() {
   console.log('\n🧪 Starting Reporting Manager & Task Delegation Test Suite...\n')
 
+  setRedisMockMode(true)
   await connectDatabase()
   log('Database connected successfully')
 
@@ -492,6 +495,8 @@ async function runTests() {
   console.log('🎉 ALL REPORTING MANAGER SCENARIOS (1-10) PASSED!')
   console.log('======================================================\n')
 
+  await closeAllQueues()
+  await closeRedisConnections()
   server.close()
   await disconnectDatabase()
   process.exit(0)
@@ -499,7 +504,11 @@ async function runTests() {
 
 runTests().catch(async (err) => {
   console.error('Test execution error:', err)
-  if (server) server.close()
-  await disconnectDatabase()
+  try {
+    await closeAllQueues()
+    await closeRedisConnections()
+    if (server) server.close()
+    await disconnectDatabase()
+  } catch {}
   process.exit(1)
 })

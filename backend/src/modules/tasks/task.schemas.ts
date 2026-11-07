@@ -74,7 +74,7 @@ export type UpdateTaskStatusInput = z.infer<typeof updateTaskStatusSchema>
 export const taskQuerySchema = z.object({
   team: z.string().optional(),
   branch: z.string().optional(),
-  status: z.enum(['todo', 'doing', 'done', 'all']).optional(),
+  status: z.enum(['todo', 'doing', 'done', 'all', 'pending', 'completed']).optional(),
   owner: z.string().optional(),
   reporting: z.enum(['me']).optional(),
   reportingManager: z.string().optional(),

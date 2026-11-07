@@ -3,6 +3,7 @@ import { toast } from 'sonner'
 import { taskService } from '../services/taskService'
 import { taskKeys } from './queryKeys'
 import { extractApiError } from '@/lib/api/errorHandler'
+import { triggerCelebration } from '../utils/celebrationTrigger'
 import type { Task, TaskStatus } from '../types/task.types'
 
 export interface UpdateStatusArgs {
@@ -21,14 +22,21 @@ export function useUpdateTaskStatus() {
       queryClient.invalidateQueries({ queryKey: ['reports'] })
       queryClient.setQueryData(taskKeys.detail(updatedTask.id), updatedTask)
 
-      const statusLabels: Record<TaskStatus, string> = {
-        todo: 'To Do',
-        doing: 'In Progress',
-        done: 'Done',
+      if (updatedTask.status === 'done') {
+        triggerCelebration(updatedTask.title)
+        toast.success('Task Completed!', {
+          description: `"${updatedTask.title}" has been saved to Task History.`,
+        })
+      } else {
+        const statusLabels: Record<TaskStatus, string> = {
+          todo: 'To Do',
+          doing: 'In Progress',
+          done: 'Done',
+        }
+        toast.success('Status updated', {
+          description: `Task is now ${statusLabels[updatedTask.status] || updatedTask.status}.`,
+        })
       }
-      toast.success('Status updated', {
-        description: `Task is now ${statusLabels[updatedTask.status] || updatedTask.status}.`,
-      })
     },
     onError: (error) => {
       const parsed = extractApiError(error)

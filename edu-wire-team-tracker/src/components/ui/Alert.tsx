@@ -17,20 +17,20 @@ export function Alert({
 }: AlertProps) {
   const variantStyles = {
     error: {
-      container: 'bg-red-50 border-red-200 text-red-900',
-      icon: <AlertCircle className="w-5 h-5 text-[#DC2626] shrink-0" />,
+      container: 'bg-tint-red-bg border-tint-red-border text-tint-red-text',
+      icon: <AlertCircle className="w-5 h-5 text-destructive shrink-0" />,
     },
     warning: {
-      container: 'bg-amber-50 border-amber-200 text-amber-900',
+      container: 'bg-tint-amber-bg border-tint-amber-border text-tint-amber-text',
       icon: <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />,
     },
     success: {
-      container: 'bg-green-50 border-green-200 text-green-900',
-      icon: <CheckCircle2 className="w-5 h-5 text-[#16A34A] shrink-0" />,
+      container: 'bg-tint-green-bg border-tint-green-border text-tint-green-text',
+      icon: <CheckCircle2 className="w-5 h-5 text-[#15803D] shrink-0" />,
     },
     info: {
-      container: 'bg-blue-50 border-blue-200 text-blue-900',
-      icon: <Info className="w-5 h-5 text-[#1D4ED8] shrink-0" />,
+      container: 'bg-tint-blue-bg border-tint-blue-border text-tint-blue-text',
+      icon: <Info className="w-5 h-5 text-brand-blue shrink-0" />,
     },
   }
 
@@ -40,7 +40,7 @@ export function Alert({
     <div
       role="alert"
       className={cn(
-        'flex items-start gap-3 p-3.5 rounded-lg border text-sm',
+        'flex items-start gap-3 p-3.5 rounded-inner border text-sm',
         current.container,
         className,
       )}
@@ -53,4 +53,3 @@ export function Alert({
     </div>
   )
 }
-

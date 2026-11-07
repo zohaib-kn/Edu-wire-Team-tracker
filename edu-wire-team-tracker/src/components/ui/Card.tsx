@@ -6,7 +6,7 @@ export const Card = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
     <div
       ref={ref}
       className={cn(
-        'rounded-xl border border-[#E2E8F0] bg-white text-[#0F172A] shadow-xs',
+        'rounded-card border border-border-subtle bg-surface text-text-primary shadow-card',
         className,
       )}
       {...props}
@@ -33,7 +33,7 @@ export const CardTitle = forwardRef<
 >(({ className, ...props }, ref) => (
   <h3
     ref={ref}
-    className={cn('text-lg font-semibold leading-tight text-[#0F172A]', className)}
+    className={cn('text-lg font-semibold leading-tight text-text-primary', className)}
     {...props}
   />
 ))
@@ -45,7 +45,7 @@ export const CardDescription = forwardRef<
 >(({ className, ...props }, ref) => (
   <p
     ref={ref}
-    className={cn('text-sm text-slate-500', className)}
+    className={cn('text-sm text-text-muted', className)}
     {...props}
   />
 ))
@@ -70,4 +70,3 @@ export const CardFooter = forwardRef<
   />
 ))
 CardFooter.displayName = 'CardFooter'
-

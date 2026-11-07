@@ -1,0 +1,96 @@
+version: '3.8'
+
+services:
+  # 1. Redis In-Memory Datastore for BullMQ Background Queues
+  redis:
+    image: redis:7-alpine
+    container_name: edutracker-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redisSecretPass123}
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-redisSecretPass123}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - edutracker-network
+
+  # 2. Express HTTP REST API Server
+  backend-api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: edutracker-api
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PORT=5000
+      - MONGODB_URI=${MONGODB_URI}
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-redisSecretPass123}
+      - USE_MOCK_REDIS=false
+      - USE_MOCK_WHATSAPP=${USE_MOCK_WHATSAPP:-true}
+    ports:
+      - "5000:5000"
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - edutracker-network
+
+  # 3. Standalone BullMQ Background Queue Worker Process
+  backend-workers:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: edutracker-workers
+    restart: unless-stopped
+    command: ["node", "dist/workers/index.js"]
+    environment:
+      - NODE_ENV=production
+      - MONGODB_URI=${MONGODB_URI}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-redisSecretPass123}
+      - USE_MOCK_REDIS=false
+      - USE_MOCK_WHATSAPP=${USE_MOCK_WHATSAPP:-true}
+      - WHATSAPP_API_TOKEN=${WHATSAPP_API_TOKEN}
+      - WHATSAPP_PHONE_NUMBER_ID=${WHATSAPP_PHONE_NUMBER_ID}
+    depends_on:
+      redis:
+        condition: service_healthy
+      backend-api:
+        condition: service_started
+    networks:
+      - edutracker-network
+
+  # 4. React Vite SPA Frontend (Served via Nginx)
+  frontend:
+    build:
+      context: ./edu-wire-team-tracker
+      dockerfile: Dockerfile
+    container_name: edutracker-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend-api
+    networks:
+      - edutracker-network
+
+networks:
+  edutracker-network:
+    driver: bridge
+
+volumes:
+  redis_data:
+    driver: local
+

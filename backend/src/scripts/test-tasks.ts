@@ -1,6 +1,8 @@
 import type { Server } from 'node:http'
 import { app } from '../app.js'
 import { connectDatabase, disconnectDatabase } from '../config/database.js'
+import { setRedisMockMode, closeRedisConnections } from '../config/redis.js'
+import { closeAllQueues } from '../queues/queue.manager.js'
 import { User } from '../models/User.js'
 import { Role } from '../models/Role.js'
 import { Branch } from '../models/Branch.js'
@@ -24,6 +26,7 @@ function assert(condition: boolean, message: string) {
 async function runTests() {
   console.log('🧪 Starting Backend Phase 3: Task Management, Activity Log & Dashboard APIs Test Suite...\n')
 
+  setRedisMockMode(true)
   await connectDatabase()
 
   // Start server on an ephemeral port
@@ -301,6 +304,8 @@ async function runTests() {
     console.error('\n❌ TEST RUN ENCOUNTERED AN ERROR:', error)
     process.exitCode = 1
   } finally {
+    await closeAllQueues()
+    await closeRedisConnections()
     if (server) {
       server.close()
     }

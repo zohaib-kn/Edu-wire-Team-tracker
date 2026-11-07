@@ -6,6 +6,7 @@ import { Branch, type IBranch } from '../../models/Branch.js'
 import { User, type IUser } from '../../models/User.js'
 import { Role, type IRole } from '../../models/Role.js'
 import { permissionsService } from '../../services/permissions.service.js'
+import { notificationService } from '../../services/notification.service.js'
 import { AppError } from '../../utils/AppError.js'
 import { getTodayDateIST } from '../../utils/dateUtils.js'
 import type { AuthenticatedUserContext } from '../../types/auth.types.js'
@@ -319,6 +320,13 @@ export const taskService = {
       at: new Date(),
     })
 
+    // Safe durable notification triggering
+    try {
+      await notificationService.handleTaskCreated(newTask)
+    } catch (notifErr: any) {
+      console.warn('[TASK_SERVICE] Notification queue warning on task creation:', notifErr.message)
+    }
+
     // 9. Populate and return
     const populated = await Task.findById(newTask._id)
       .populate('team')
@@ -380,7 +388,13 @@ export const taskService = {
 
     // Status filter
     if (query.status && query.status !== 'all') {
-      filter.status = query.status
+      if (query.status === 'done' || query.status === 'completed') {
+        filter.status = 'done'
+      } else if (query.status === 'pending') {
+        filter.status = { $in: ['todo', 'doing'] }
+      } else {
+        filter.status = query.status
+      }
     }
 
     // Owner filter
@@ -666,6 +680,14 @@ export const taskService = {
         to: Object.fromEntries(Object.entries(changes).map(([k, v]) => [k, v.to])),
         at: new Date(),
       })
+
+      if (changes.owner || changes.reportingManager) {
+        try {
+          await notificationService.handleTaskReassigned(task, changes as any)
+        } catch (notifErr: any) {
+          console.warn('[TASK_SERVICE] Notification queue warning on task reassignment:', notifErr.message)
+        }
+      }
     }
 
     const populated = await Task.findById(task._id)

@@ -28,7 +28,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     ref,
   ) => {
     const baseClasses =
-      'inline-flex items-center justify-center font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 select-none disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer'
+      'inline-flex items-center justify-center font-medium rounded-nav transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 select-none disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer'
 
     const sizeClasses = {
       sm: 'h-8 px-3 text-xs gap-1.5',
@@ -38,15 +38,15 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
 
     const variantClasses = {
       primary:
-        'bg-[#1D4ED8] hover:bg-[#1E40AF] text-white shadow-xs focus:ring-[#1D4ED8]',
+        'bg-brand-blue hover:bg-brand-blue-hover text-white shadow-card focus-visible:ring-brand-blue/30',
       secondary:
-        'bg-slate-100 hover:bg-slate-200 text-slate-800 focus:ring-slate-400',
+        'bg-slate-100 hover:bg-slate-200 text-text-primary focus-visible:ring-slate-300',
       outline:
-        'bg-white border border-[#E2E8F0] hover:bg-slate-50 text-slate-700 shadow-xs focus:ring-[#1D4ED8]',
+        'bg-surface border border-border-subtle hover:bg-slate-50 text-text-primary shadow-card focus-visible:ring-brand-blue/30',
       ghost:
-        'bg-transparent hover:bg-slate-100 text-slate-700 focus:ring-slate-300',
+        'bg-transparent hover:bg-slate-100 text-text-muted hover:text-text-primary focus-visible:ring-slate-200',
       danger:
-        'bg-[#DC2626] hover:bg-red-700 text-white shadow-xs focus:ring-[#DC2626]',
+        'bg-destructive hover:bg-destructive-hover text-white shadow-card focus-visible:ring-destructive/30',
     }
 
     return (
@@ -75,4 +75,3 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
 )
 
 Button.displayName = 'Button'
-

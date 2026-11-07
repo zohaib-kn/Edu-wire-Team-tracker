@@ -32,10 +32,10 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
         {label && (
           <label
             htmlFor={textareaId}
-            className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5"
+            className="block text-xs font-semibold uppercase tracking-wider text-text-primary mb-1.5"
           >
             {label}
-            {props.required && <span className="text-[#DC2626] ml-1" aria-hidden="true">*</span>}
+            {props.required && <span className="text-destructive ml-1" aria-hidden="true">*</span>}
           </label>
         )}
 
@@ -48,22 +48,22 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
           aria-invalid={Boolean(error)}
           aria-describedby={error ? errorId : helperText ? helperId : undefined}
           className={cn(
-            'w-full rounded-lg bg-white p-3 text-sm text-[#0F172A] placeholder:text-slate-400',
-            'border border-[#E2E8F0] shadow-xs transition-colors',
-            'focus:border-[#1D4ED8] focus:outline-none focus:ring-2 focus:ring-[#1D4ED8]/20',
-            'disabled:bg-slate-50 disabled:text-slate-400 disabled:cursor-not-allowed',
-            error && 'border-[#DC2626] focus:border-[#DC2626] focus:ring-[#DC2626]/20',
+            'w-full rounded-input bg-surface p-3 text-sm text-text-primary placeholder:text-text-muted/60',
+            'border border-border-subtle shadow-card transition-colors',
+            'focus:border-brand-blue focus:outline-none focus:ring-2 focus:ring-brand-blue/20',
+            'disabled:bg-slate-50 disabled:text-text-muted disabled:cursor-not-allowed',
+            error && 'border-destructive focus:border-destructive focus:ring-destructive/20',
             className,
           )}
           {...props}
         />
 
         {error ? (
-          <p id={errorId} role="alert" className="mt-1 text-xs text-[#DC2626]">
+          <p id={errorId} role="alert" className="mt-1 text-xs text-destructive">
             {error}
           </p>
         ) : helperText ? (
-          <p id={helperId} className="mt-1 text-xs text-slate-500">
+          <p id={helperId} className="mt-1 text-xs text-text-muted">
             {helperText}
           </p>
         ) : null}
@@ -73,4 +73,3 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
 )
 
 Textarea.displayName = 'Textarea'
-

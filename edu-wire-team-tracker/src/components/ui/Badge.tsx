@@ -14,10 +14,10 @@ export function Badge({
   ...props
 }: BadgeProps) {
   const variantClasses = {
-    primary: 'bg-blue-50 text-[#1D4ED8] border-blue-200',
-    success: 'bg-green-50 text-[#16A34A] border-green-200',
-    warning: 'bg-amber-50 text-amber-700 border-amber-200',
-    error: 'bg-red-50 text-[#DC2626] border-red-200',
+    primary: 'bg-tint-blue-bg text-tint-blue-text border-tint-blue-border',
+    success: 'bg-tint-green-bg text-tint-green-text border-tint-green-border',
+    warning: 'bg-tint-amber-bg text-tint-amber-text border-tint-amber-border',
+    error: 'bg-tint-red-bg text-tint-red-text border-tint-red-border',
     neutral: 'bg-slate-100 text-slate-700 border-slate-200',
   }
 
@@ -29,7 +29,7 @@ export function Badge({
   return (
     <span
       className={cn(
-        'inline-flex items-center font-medium rounded-full border',
+        'inline-flex items-center font-medium rounded-badge border transition-colors',
         variantClasses[variant],
         sizeClasses[size],
         className,
@@ -40,4 +40,3 @@ export function Badge({
     </span>
   )
 }
-

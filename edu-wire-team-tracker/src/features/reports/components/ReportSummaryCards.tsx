@@ -1,5 +1,4 @@
 import { CheckCircle2, Clock, Percent, CalendarRange } from 'lucide-react'
-import { Card, CardContent } from '@/components/ui/Card'
 
 export interface ReportSummaryCardsProps {
   completed: number
@@ -27,91 +26,81 @@ export function ReportSummaryCards({
   return (
     <div className="space-y-3">
       {period && (
-        <div className="flex items-center gap-1.5 text-xs text-slate-500">
-          <CalendarRange className="w-3.5 h-3.5 text-slate-400" />
-          <span>Reporting Period: <strong className="text-slate-800">{period}</strong></span>
+        <div className="flex items-center gap-1.5 text-xs text-text-muted">
+          <CalendarRange className="w-3.5 h-3.5 text-text-muted/70" />
+          <span>
+            Reporting Period: <strong className="text-text-primary">{period}</strong>
+          </span>
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {/* Completed Tasks Card */}
-        <Card className="shadow-xs border-l-4 border-l-[#16A34A] transition-shadow hover:shadow-sm">
-          <CardContent className="p-4 sm:p-5">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-xs sm:text-sm font-medium text-slate-600">
-                Completed Tasks
-              </span>
-              <div className="w-8 h-8 rounded-lg bg-green-50 text-[#16A34A] border border-green-100 flex items-center justify-center">
-                <CheckCircle2 className="w-4 h-4" />
-              </div>
-            </div>
+        <div className="rounded-card bg-surface border border-tint-green-border/70 p-5 shadow-card hover:shadow-card-hover transition-all flex items-center gap-4">
+          <div className="w-12 h-12 rounded-inner bg-tint-green-bg border border-tint-green-border text-tint-green-text flex items-center justify-center shrink-0">
+            <CheckCircle2 className="w-5 h-5" strokeWidth={1.75} />
+          </div>
 
-            <div className="mt-2 flex items-baseline">
-              <span className="text-2xl sm:text-3xl font-bold tracking-tight text-[#16A34A]">
-                {completed}
-              </span>
-            </div>
-            <p className="mt-1 text-[11px] text-slate-400">
+          <div className="flex flex-col min-w-0">
+            <span className="text-xs font-medium text-text-muted truncate">
+              Completed Tasks
+            </span>
+            <span className="text-3xl font-bold tracking-tight text-tint-green-text mt-0.5">
+              {completed}
+            </span>
+            <p className="mt-0.5 text-[11px] text-text-muted truncate">
               Tasks finished in this reporting cycle
             </p>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
         {/* Pending Tasks Card */}
-        <Card className="shadow-xs border-l-4 border-l-slate-400 transition-shadow hover:shadow-sm">
-          <CardContent className="p-4 sm:p-5">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-xs sm:text-sm font-medium text-slate-600">
-                Pending Tasks
-              </span>
-              <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-700 border border-slate-200 flex items-center justify-center">
-                <Clock className="w-4 h-4" />
-              </div>
-            </div>
+        <div className="rounded-card bg-surface border border-tint-amber-border/70 p-5 shadow-card hover:shadow-card-hover transition-all flex items-center gap-4">
+          <div className="w-12 h-12 rounded-inner bg-tint-amber-bg border border-tint-amber-border text-tint-amber-text flex items-center justify-center shrink-0">
+            <Clock className="w-5 h-5" strokeWidth={1.75} />
+          </div>
 
-            <div className="mt-2 flex items-baseline">
-              <span className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-800">
-                {pending}
-              </span>
-            </div>
-            <p className="mt-1 text-[11px] text-slate-400">
+          <div className="flex flex-col min-w-0">
+            <span className="text-xs font-medium text-text-muted truncate">
+              Pending Tasks
+            </span>
+            <span className="text-3xl font-bold tracking-tight text-tint-amber-text mt-0.5">
+              {pending}
+            </span>
+            <p className="mt-0.5 text-[11px] text-text-muted truncate">
               Active tasks in progress or to do
             </p>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
         {/* Completion Rate Card */}
-        <Card className="shadow-xs border-l-4 border-l-[#1D4ED8] transition-shadow hover:shadow-sm">
-          <CardContent className="p-4 sm:p-5">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-xs sm:text-sm font-medium text-slate-600">
-                Completion Rate
-              </span>
-              <div className="w-8 h-8 rounded-lg bg-blue-50 text-[#1D4ED8] border border-blue-100 flex items-center justify-center">
-                <Percent className="w-4 h-4" />
-              </div>
-            </div>
+        <div className="rounded-card bg-surface border border-tint-blue-border/70 p-5 shadow-card hover:shadow-card-hover transition-all flex items-center gap-4">
+          <div className="w-12 h-12 rounded-inner bg-tint-blue-bg border border-tint-blue-border text-tint-blue-text flex items-center justify-center shrink-0">
+            <Percent className="w-5 h-5" strokeWidth={1.75} />
+          </div>
 
-            <div className="mt-2 flex items-baseline gap-2">
-              <span className="text-2xl sm:text-3xl font-bold tracking-tight text-[#1D4ED8]">
+          <div className="flex flex-col min-w-0 flex-1">
+            <span className="text-xs font-medium text-text-muted truncate">
+              Completion Rate
+            </span>
+            <div className="flex items-baseline gap-2 mt-0.5">
+              <span className="text-3xl font-bold tracking-tight text-brand-blue">
                 {rate}%
               </span>
-              <span className="text-xs text-slate-400">
+              <span className="text-xs text-text-muted">
                 of {calculatedTotal} total
               </span>
             </div>
-
             {/* Subtle Progress Bar */}
-            <div className="mt-2 w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+            <div className="mt-1.5 w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
               <div
-                className="h-full bg-[#16A34A] rounded-full transition-all duration-300"
+                className="h-full bg-[#15803D] rounded-full transition-all duration-300"
                 style={{ width: `${Math.min(rate, 100)}%` }}
               />
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
     </div>
   )
 }
-

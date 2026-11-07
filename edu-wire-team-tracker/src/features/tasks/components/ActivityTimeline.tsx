@@ -8,7 +8,7 @@ export interface ActivityTimelineProps {
 export function ActivityTimeline({ activities = [] }: ActivityTimelineProps) {
   if (!activities || activities.length === 0) {
     return (
-      <div className="py-6 text-center text-xs text-slate-400 border border-dashed border-slate-200 rounded-lg">
+      <div className="py-6 text-center text-xs text-text-muted border border-dashed border-border-subtle rounded-inner">
         No activity history recorded for this task yet.
       </div>
     )
@@ -20,31 +20,31 @@ export function ActivityTimeline({ activities = [] }: ActivityTimelineProps) {
         return {
           label: 'Task created',
           icon: PlusCircle,
-          colorClass: 'text-blue-600 bg-blue-50 border-blue-200',
+          colorClass: 'text-brand-blue bg-tint-blue-bg border-tint-blue-border',
         }
       case 'edited':
         return {
           label: 'Task updated',
           icon: Edit3,
-          colorClass: 'text-amber-600 bg-amber-50 border-amber-200',
+          colorClass: 'text-tint-amber-text bg-tint-amber-bg border-tint-amber-border',
         }
       case 'status_changed':
         return {
           label: 'Status changed',
           icon: ArrowRightCircle,
-          colorClass: 'text-purple-600 bg-purple-50 border-purple-200',
+          colorClass: 'text-indigo-600 bg-indigo-50 border-indigo-200',
         }
       case 'deleted':
         return {
           label: 'Task deleted',
           icon: Trash2,
-          colorClass: 'text-red-600 bg-red-50 border-red-200',
+          colorClass: 'text-destructive bg-tint-red-bg border-tint-red-border',
         }
       default:
         return {
           label: action,
           icon: Clock,
-          colorClass: 'text-slate-600 bg-slate-50 border-slate-200',
+          colorClass: 'text-text-muted bg-slate-50 border-border-subtle',
         }
     }
   }
@@ -64,7 +64,7 @@ export function ActivityTimeline({ activities = [] }: ActivityTimelineProps) {
   }
 
   return (
-    <div className="relative pl-6 space-y-6 before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
+    <div className="relative pl-6 space-y-5 before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-border-subtle">
       {activities.map((item, idx) => {
         const config = getActionConfig(item.action)
         const Icon = config.icon
@@ -73,39 +73,39 @@ export function ActivityTimeline({ activities = [] }: ActivityTimelineProps) {
           <div key={item.id || idx} className="relative flex items-start gap-3 text-xs">
             {/* Timeline node icon */}
             <div
-              className={`absolute -left-6 top-0.5 w-5 h-5 rounded-full border flex items-center justify-center shrink-0 ${config.colorClass}`}
+              className={`absolute -left-6 top-0.5 w-5 h-5 rounded-full border flex items-center justify-center shrink-0 shadow-xs ${config.colorClass}`}
             >
               <Icon className="w-3 h-3" />
             </div>
 
-            <div className="flex-1 bg-white border border-[#E2E8F0] rounded-lg p-3 shadow-xs">
+            <div className="flex-1 bg-surface border border-border-subtle rounded-inner p-3.5 shadow-card">
               <div className="flex items-center justify-between gap-2 mb-1">
-                <span className="font-semibold text-[#0F172A]">
+                <span className="font-semibold text-text-primary">
                   {config.label}
                 </span>
-                <span className="text-[11px] text-slate-400">
+                <span className="text-[11px] text-text-muted">
                   {formatTimestamp(item.timestamp)}
                 </span>
               </div>
 
-              <p className="text-slate-600">
-                by <span className="font-medium text-slate-900">{item.user || 'Unknown'}</span>
+              <p className="text-text-muted">
+                by <span className="font-medium text-text-primary">{item.user || 'Unknown'}</span>
                 {item.details && ` • ${item.details}`}
               </p>
 
               {/* Field Changes */}
               {item.fieldChanges && item.fieldChanges.length > 0 && (
-                <div className="mt-2 pt-2 border-t border-slate-100 space-y-1 text-[11px]">
+                <div className="mt-2 pt-2 border-t border-border-subtle/50 space-y-1 text-[11px]">
                   {item.fieldChanges.map((change, cIdx) => (
-                    <div key={cIdx} className="flex items-center gap-1.5 text-slate-500">
-                      <span className="font-medium capitalize text-slate-700">
+                    <div key={cIdx} className="flex items-center gap-1.5 text-text-muted">
+                      <span className="font-medium capitalize text-text-primary">
                         {change.field}:
                       </span>
-                      <span className="line-through text-slate-400">
+                      <span className="line-through text-text-muted/60">
                         {String(change.oldValue ?? '')}
                       </span>
                       <span>&rarr;</span>
-                      <span className="font-medium text-[#0F172A]">
+                      <span className="font-semibold text-text-primary">
                         {String(change.newValue ?? '')}
                       </span>
                     </div>
@@ -119,4 +119,3 @@ export function ActivityTimeline({ activities = [] }: ActivityTimelineProps) {
     </div>
   )
 }
-
