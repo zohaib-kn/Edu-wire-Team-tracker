@@ -55,6 +55,7 @@ export const reportService = {
     const query: Record<string, any> = {
       deletedAt: null,
       status: { $ne: 'done' },
+      taskLevel: { $ne: 'parent' },
       ...scopeFilter,
     }
 
@@ -248,10 +249,11 @@ export const reportService = {
           ? branchDoc.name
           : 'Headquarters'
 
-        // Completed in 7-day period
+        // Completed actionable tasks in 7-day period
         const completedCount = await Task.countDocuments({
           team: teamDoc._id,
           status: 'done',
+          taskLevel: { $ne: 'parent' },
           deletedAt: null,
           $or: [
             { doneAt: { $gte: sevenDaysAgo } },
@@ -259,10 +261,11 @@ export const reportService = {
           ],
         }).exec()
 
-        // Currently pending
+        // Currently pending actionable tasks
         const pendingCount = await Task.countDocuments({
           team: teamDoc._id,
           status: { $ne: 'done' },
+          taskLevel: { $ne: 'parent' },
           deletedAt: null,
         }).exec()
 

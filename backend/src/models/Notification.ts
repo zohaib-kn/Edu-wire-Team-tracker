@@ -15,6 +15,7 @@ export type NotificationType =
   | 'task_assigned'
   | 'task_reminder'
   | 'task_completed'
+  | 'task_discussion_message'
   | 'daily_report'
   | 'weekly_summary'
   | string

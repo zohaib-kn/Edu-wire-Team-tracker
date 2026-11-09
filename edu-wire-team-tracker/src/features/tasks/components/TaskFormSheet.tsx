@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
-import { useForm, useWatch } from 'react-hook-form'
+import { useForm, useWatch, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
+import { Plus, Trash2, User, Layers } from 'lucide-react'
 import { Sheet } from '@/components/ui/Sheet'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -9,6 +10,7 @@ import { Textarea } from '@/components/ui/Textarea'
 import { Modal } from '@/components/ui/Modal'
 import { Alert } from '@/components/ui/Alert'
 import { Spinner } from '@/components/ui/Spinner'
+import { cn } from '@/lib/utils/cn'
 import {
   createTaskSchema,
   editTaskSchema,
@@ -43,6 +45,7 @@ function TaskFormSheetInner({
   const isEditing = Boolean(taskToEdit)
   const isSuperAdmin = user?.role === 'Super Admin'
 
+  const [mode, setMode] = useState<'single' | 'multiple'>('single')
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
 
@@ -68,6 +71,7 @@ function TaskFormSheetInner({
   }, [taskToEdit, isSuperAdmin, branches, user])
 
   const defaultValues: CreateTaskFormValues = {
+    mode: 'single',
     title: taskToEdit?.title || '',
     note: taskToEdit?.note || '',
     branch: initialBranch,
@@ -80,6 +84,7 @@ function TaskFormSheetInner({
         : taskToEdit.due
       : getTodayDateStringKolkata(),
     priority: taskToEdit?.priority || 'normal',
+    subtasks: [],
   }
 
   const {
@@ -95,10 +100,18 @@ function TaskFormSheetInner({
     mode: 'onTouched',
   })
 
-  // Watch branch, team, and owner for dynamic cascading
+  const { fields, append, remove, replace } = useFieldArray({
+    control,
+    name: 'subtasks',
+  })
+
+  // Watch branch, team, owner, due date, and subtasks
   const selectedBranch = useWatch({ control, name: 'branch' }) || initialBranch
   const selectedTeam = useWatch({ control, name: 'team' }) || ''
   const selectedOwner = useWatch({ control, name: 'owner' }) || ''
+  const selectedDue = useWatch({ control, name: 'due' }) || getTodayDateStringKolkata()
+  const selectedPriority = useWatch({ control, name: 'priority' }) || 'normal'
+  const watchedSubtasks = useWatch({ control, name: 'subtasks' }) || []
 
   // Filter teams by selected branch
   const filteredTeams = useMemo(() => {
@@ -117,7 +130,7 @@ function TaskFormSheetInner({
         t.branchId === branchNameToMatch,
     )
 
-    // For Team Lead, further restrict to only their authorized teams
+    // For Team Lead, further restrict to authorized teams
     if (user?.role === 'Team Lead' && user.teams && user.teams.length > 0) {
       teamsList = teamsList.filter(
         (t) => user.teams.includes(t.id) || user.teams.includes(t.name),
@@ -136,7 +149,7 @@ function TaskFormSheetInner({
   const defaultLeadId = currentTeamDoc?.leadId || currentTeamDoc?.lead || ''
   const defaultLeadName = currentTeamDoc?.leadName || currentTeamDoc?.lead || ''
 
-  // Load team members for owner dropdown
+  // Load team members for owner / subtask dropdowns
   const { data: teamMembers = [], isLoading: isLoadingMembers } = useTeamMembers(
     currentTeamDoc?.id || selectedTeam,
   )
@@ -178,11 +191,41 @@ function TaskFormSheetInner({
     onClose()
   }
 
+  const handleModeChange = (newMode: 'single' | 'multiple') => {
+    setMode(newMode)
+    setValue('mode', newMode, { shouldValidate: true })
+    setSubmitError(null)
+
+    if (newMode === 'multiple' && fields.length === 0) {
+      append([
+        {
+          owner: '',
+          responsibilityLabel: 'Frontend Developer',
+          title: '',
+          note: '',
+          due: selectedDue || getTodayDateStringKolkata(),
+          priority: selectedPriority || 'normal',
+          isRequired: true,
+        },
+        {
+          owner: '',
+          responsibilityLabel: 'Backend Developer',
+          title: '',
+          note: '',
+          due: selectedDue || getTodayDateStringKolkata(),
+          priority: selectedPriority || 'normal',
+          isRequired: true,
+        },
+      ])
+    }
+  }
+
   const onSubmit = async (values: CreateTaskFormValues) => {
     setSubmitError(null)
 
-    // Prevent assigning employee as their own reporting manager
+    // Prevent assigning employee as their own reporting manager in single mode
     if (
+      values.mode === 'single' &&
       values.owner &&
       values.reportingManager &&
       values.owner.toLowerCase() === values.reportingManager.toLowerCase()
@@ -201,12 +244,31 @@ function TaskFormSheetInner({
           due: values.due,
           priority: values.priority,
         })
+      } else if (values.mode === 'multiple' && values.subtasks && values.subtasks.length > 0) {
+        await createTaskMutation.mutateAsync({
+          title: values.title,
+          branch: values.branch,
+          team: values.team,
+          reportingManager: values.reportingManager || undefined,
+          due: values.due,
+          priority: values.priority,
+          note: values.note,
+          subtasks: values.subtasks.map((st) => ({
+            title: st.title,
+            owner: st.owner,
+            responsibilityLabel: st.responsibilityLabel || undefined,
+            note: st.note || undefined,
+            due: st.due || values.due,
+            priority: st.priority || values.priority,
+            isRequired: st.isRequired !== false,
+          })),
+        })
       } else {
         await createTaskMutation.mutateAsync({
           title: values.title,
           branch: values.branch,
           team: values.team,
-          owner: values.owner,
+          owner: values.owner!,
           reportingManager: values.reportingManager || undefined,
           due: values.due,
           priority: values.priority,
@@ -224,11 +286,10 @@ function TaskFormSheetInner({
     }
   }
 
-  // Filter out the selected owner from candidate reporting managers
+  // Filter out selected owner from candidate reporting managers (in single mode)
   const eligibleReportingManagers = useMemo(() => {
     const list = [...branchSupervisors]
 
-    // Ensure default team lead is present in the list
     if (defaultLeadId || defaultLeadName) {
       const exists = list.some(
         (m) =>
@@ -244,26 +305,33 @@ function TaskFormSheetInner({
       }
     }
 
-    // Filter out user matching the current owner
-    if (!selectedOwner) return list
+    if (mode === 'multiple' || !selectedOwner) return list
     return list.filter(
       (m) =>
         m.id !== selectedOwner &&
         m.name.toLowerCase() !== selectedOwner.toLowerCase() &&
         m.email?.toLowerCase() !== selectedOwner.toLowerCase(),
     )
-  }, [branchSupervisors, defaultLeadId, defaultLeadName, selectedOwner])
+  }, [branchSupervisors, defaultLeadId, defaultLeadName, selectedOwner, mode])
 
   return (
     <>
       <Sheet
         isOpen={true}
         onClose={handleCloseAttempt}
-        title={isEditing ? 'Edit Task' : 'Create New Task'}
+        title={
+          isEditing
+            ? 'Edit Task'
+            : mode === 'multiple'
+            ? 'Create Multi-Assignee Parent Task'
+            : 'Create New Task'
+        }
         description={
           isEditing
             ? `Editing task "${taskToEdit?.title}". Team and branch are locked.`
-            : 'Fill in the details below to delegate and track a new task.'
+            : mode === 'multiple'
+            ? 'Create a parent task with multiple independently assigned employee subtasks.'
+            : 'Fill in the details below to delegate and track a single-assignee task.'
         }
         footer={
           <>
@@ -283,7 +351,11 @@ function TaskFormSheetInner({
               isLoading={isSaving}
               onClick={handleSubmit(onSubmit)}
             >
-              {isEditing ? 'Save Changes' : 'Create Task'}
+              {isEditing
+                ? 'Save Changes'
+                : mode === 'multiple'
+                ? 'Create Parent Task & Assignments'
+                : 'Create Task'}
             </Button>
           </>
         }
@@ -295,13 +367,45 @@ function TaskFormSheetInner({
             </Alert>
           )}
 
+          {/* ── Mode Switcher (Create Mode Only) ── */}
+          {!isEditing && (
+            <div className="p-1 bg-slate-100 rounded-lg flex items-center gap-1 border border-slate-200/60">
+              <button
+                type="button"
+                onClick={() => handleModeChange('single')}
+                className={cn(
+                  'flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-semibold rounded-md transition-all cursor-pointer',
+                  mode === 'single'
+                    ? 'bg-white text-brand-blue shadow-sm'
+                    : 'text-text-muted hover:text-text-primary',
+                )}
+              >
+                <User className="w-3.5 h-3.5" />
+                <span>Single Assignment</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleModeChange('multiple')}
+                className={cn(
+                  'flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-semibold rounded-md transition-all cursor-pointer',
+                  mode === 'multiple'
+                    ? 'bg-white text-brand-blue shadow-sm'
+                    : 'text-text-muted hover:text-text-primary',
+                )}
+              >
+                <Layers className="w-3.5 h-3.5" />
+                <span>Multiple Assignments</span>
+              </button>
+            </div>
+          )}
+
           {/* =========================================================================
-              SECTION A — TASK DETAILS
+              SECTION A — TASK DETAILS / PARENT TASK DETAILS
              ========================================================================= */}
           <div className="space-y-4">
             <div className="pb-1 border-b border-slate-100">
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                Section A — Task Details
+                {mode === 'multiple' ? 'Section A — Parent Task Details' : 'Section A — Task Details'}
               </h3>
             </div>
 
@@ -310,8 +414,12 @@ function TaskFormSheetInner({
               <Input
                 {...register('title')}
                 id="title"
-                label="Task Title"
-                placeholder="e.g. Follow up on student visa documentation"
+                label={mode === 'multiple' ? 'Parent Task Title' : 'Task Title'}
+                placeholder={
+                  mode === 'multiple'
+                    ? 'e.g. Build a New CRM Platform'
+                    : 'e.g. Follow up on student visa documentation'
+                }
                 required
                 autoFocus
                 error={errors.title?.message}
@@ -319,13 +427,21 @@ function TaskFormSheetInner({
               />
             </div>
 
-            {/* 2. Instructions / Note (Optional) */}
+            {/* 2. Instructions / Note */}
             <div>
               <Textarea
                 {...register('note')}
                 id="note"
-                label="Instructions / Notes (Optional)"
-                placeholder="Add relevant context, checklist items, or links..."
+                label={
+                  mode === 'multiple'
+                    ? 'Overall Project Description / Notes (Optional)'
+                    : 'Instructions / Notes (Optional)'
+                }
+                placeholder={
+                  mode === 'multiple'
+                    ? 'High-level objective, milestones, or overall requirements...'
+                    : 'Add relevant context, checklist items, or links...'
+                }
                 rows={3}
                 error={errors.note?.message}
                 disabled={isSaving}
@@ -334,12 +450,12 @@ function TaskFormSheetInner({
           </div>
 
           {/* =========================================================================
-              SECTION B — ASSIGNMENT
+              SECTION B — SCOPE & SUPERVISION
              ========================================================================= */}
           <div className="space-y-4 pt-2">
             <div className="pb-1 border-b border-slate-100">
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                Section B — Assignment
+                Section B — Scope &amp; Supervision
               </h3>
             </div>
 
@@ -360,10 +476,31 @@ function TaskFormSheetInner({
                   <Select
                     {...register('branch', {
                       onChange: () => {
-                        // Reset dependent team, owner, and reporting manager selections
                         setValue('team', '', { shouldValidate: true })
                         setValue('owner', '', { shouldValidate: true })
                         setValue('reportingManager', '', { shouldValidate: true })
+                        if (mode === 'multiple') {
+                          replace([
+                            {
+                              owner: '',
+                              responsibilityLabel: 'Frontend Developer',
+                              title: '',
+                              note: '',
+                              due: selectedDue || getTodayDateStringKolkata(),
+                              priority: selectedPriority || 'normal',
+                              isRequired: true,
+                            },
+                            {
+                              owner: '',
+                              responsibilityLabel: 'Backend Developer',
+                              title: '',
+                              note: '',
+                              due: selectedDue || getTodayDateStringKolkata(),
+                              priority: selectedPriority || 'normal',
+                              isRequired: true,
+                            },
+                          ])
+                        }
                       },
                     })}
                     id="branch"
@@ -428,8 +565,29 @@ function TaskFormSheetInner({
                   <Select
                     {...register('team', {
                       onChange: () => {
-                        // Reset owner when team changes
                         setValue('owner', '', { shouldValidate: true })
+                        if (mode === 'multiple') {
+                          replace([
+                            {
+                              owner: '',
+                              responsibilityLabel: 'Frontend Developer',
+                              title: '',
+                              note: '',
+                              due: selectedDue || getTodayDateStringKolkata(),
+                              priority: selectedPriority || 'normal',
+                              isRequired: true,
+                            },
+                            {
+                              owner: '',
+                              responsibilityLabel: 'Backend Developer',
+                              title: '',
+                              note: '',
+                              due: selectedDue || getTodayDateStringKolkata(),
+                              priority: selectedPriority || 'normal',
+                              isRequired: true,
+                            },
+                          ])
+                        }
                       },
                     })}
                     id="team"
@@ -464,54 +622,7 @@ function TaskFormSheetInner({
               )}
             </div>
 
-            {/* 5. Task Owner Selection */}
-            <div>
-              <label
-                htmlFor="owner"
-                className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5"
-              >
-                Task Owner <span className="text-red-500">*</span>
-              </label>
-              {isLoadingMembers ? (
-                <div className="h-10 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-400 flex items-center gap-2">
-                  <Spinner size="sm" />
-                  <span>Loading team members...</span>
-                </div>
-              ) : teamMembers.length > 0 ? (
-                <Select
-                  {...register('owner')}
-                  id="owner"
-                  error={errors.owner?.message}
-                  disabled={isSaving}
-                >
-                  <option value="">Select team member</option>
-                  {teamMembers.map((m) => (
-                    <option key={m.id} value={m.name || m.id}>
-                      {m.name} {m.email ? `(${m.email})` : ''}
-                    </option>
-                  ))}
-                </Select>
-              ) : (
-                <Input
-                  {...register('owner')}
-                  id="owner"
-                  placeholder="Enter employee name or email"
-                  required
-                  helperText={
-                    selectedTeam
-                      ? 'No active members registered in this team. Enter user name or email.'
-                      : 'Select a team above to view eligible team members.'
-                  }
-                  error={errors.owner?.message}
-                  disabled={isSaving}
-                />
-              )}
-              <span className="text-[11px] text-slate-400 mt-1 block">
-                The employee responsible for performing and completing the task.
-              </span>
-            </div>
-
-            {/* 6. Reporting Manager Selection */}
+            {/* 5. Reporting Manager Selection */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label
@@ -521,7 +632,7 @@ function TaskFormSheetInner({
                   Reporting Manager
                 </label>
                 {defaultLeadName && (
-                  <span className="text-[11px] font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+                  <span className="text-[11px] font-medium text-brand-blue bg-blue-50 px-2 py-0.5 rounded-full">
                     Default: {defaultLeadName} (Team Lead)
                   </span>
                 )}
@@ -564,23 +675,291 @@ function TaskFormSheetInner({
           </div>
 
           {/* =========================================================================
-              SECTION C — SCHEDULE
+              SINGLE MODE: SINGLE TASK OWNER SELECTION
+             ========================================================================= */}
+          {mode === 'single' && (
+            <div className="space-y-4 pt-2">
+              <div className="pb-1 border-b border-slate-100">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Section C — Task Assignment
+                </h3>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="owner"
+                  className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5"
+                >
+                  Task Owner <span className="text-red-500">*</span>
+                </label>
+                {isLoadingMembers ? (
+                  <div className="h-10 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-400 flex items-center gap-2">
+                    <Spinner size="sm" />
+                    <span>Loading team members...</span>
+                  </div>
+                ) : teamMembers.length > 0 ? (
+                  <Select
+                    {...register('owner')}
+                    id="owner"
+                    error={errors.owner?.message}
+                    disabled={isSaving}
+                  >
+                    <option value="">Select team member</option>
+                    {teamMembers.map((m) => (
+                      <option key={m.id} value={m.name || m.id}>
+                        {m.name} {m.email ? `(${m.email})` : ''}
+                      </option>
+                    ))}
+                  </Select>
+                ) : (
+                  <Input
+                    {...register('owner')}
+                    id="owner"
+                    placeholder="Enter employee name or email"
+                    required
+                    helperText={
+                      selectedTeam
+                        ? 'No active members registered in this team. Enter user name or email.'
+                        : 'Select a team above to view eligible team members.'
+                    }
+                    error={errors.owner?.message}
+                    disabled={isSaving}
+                  />
+                )}
+                <span className="text-[11px] text-slate-400 mt-1 block">
+                  The employee responsible for performing and completing this task.
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* =========================================================================
+              MULTIPLE MODE: INDIVIDUAL ASSIGNMENTS REPEATER
+             ========================================================================= */}
+          {mode === 'multiple' && (
+            <div className="space-y-4 pt-2">
+              <div className="flex items-center justify-between pb-1 border-b border-slate-100">
+                <div>
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                    Section C — Individual Assignments ({fields.length})
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Assign individual responsibilities to active team members.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    append({
+                      owner: '',
+                      responsibilityLabel: '',
+                      title: '',
+                      note: '',
+                      due: selectedDue || getTodayDateStringKolkata(),
+                      priority: selectedPriority || 'normal',
+                      isRequired: true,
+                    })
+                  }
+                  leftIcon={<Plus className="w-3.5 h-3.5" />}
+                >
+                  Add Member
+                </Button>
+              </div>
+
+              {errors.subtasks?.root?.message && (
+                <p className="text-xs text-red-500 font-medium">
+                  {errors.subtasks.root.message}
+                </p>
+              )}
+
+              <div className="space-y-3.5">
+                {fields.map((field, index) => {
+                  const otherAssignedOwners = watchedSubtasks
+                    ?.map((s, i) => (i !== index ? s?.owner : null))
+                    .filter(Boolean) as string[]
+
+                  return (
+                    <div
+                      key={field.id}
+                      className="p-3.5 rounded-inner border border-slate-200 bg-slate-50/70 space-y-3 relative transition-all hover:border-slate-300"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="w-5 h-5 rounded-full bg-brand-blue text-white text-[11px] font-bold flex items-center justify-center">
+                            {index + 1}
+                          </span>
+                          <span className="text-xs font-semibold text-slate-800">
+                            Assignment #{index + 1}
+                          </span>
+                        </div>
+                        {fields.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => remove(index)}
+                            className="text-slate-400 hover:text-red-500 p-1 rounded transition-colors cursor-pointer"
+                            title="Remove assignment"
+                            aria-label={`Remove assignment ${index + 1}`}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Row 1: Assign To & Responsibility */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label
+                            htmlFor={`subtask-owner-${index}`}
+                            className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1"
+                          >
+                            Assign To <span className="text-red-500">*</span>
+                          </label>
+                          <Select
+                            {...register(`subtasks.${index}.owner` as const)}
+                            id={`subtask-owner-${index}`}
+                            error={errors.subtasks?.[index]?.owner?.message}
+                            disabled={isSaving || isLoadingMembers}
+                          >
+                            <option value="">Select team member</option>
+                            {teamMembers.map((m) => {
+                              const val = m.name || m.id
+                              const isTaken = otherAssignedOwners.includes(val) || otherAssignedOwners.includes(m.id)
+                              return (
+                                <option key={m.id} value={val} disabled={isTaken}>
+                                  {m.name} {isTaken ? '(Already assigned)' : ''}
+                                </option>
+                              )
+                            })}
+                          </Select>
+                        </div>
+
+                        <div>
+                          <Input
+                            {...register(`subtasks.${index}.responsibilityLabel` as const)}
+                            id={`subtask-role-${index}`}
+                            label="Responsibility / Role"
+                            placeholder="e.g. Frontend Developer, QA"
+                            error={errors.subtasks?.[index]?.responsibilityLabel?.message}
+                            disabled={isSaving}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Row 2: Subtask Title */}
+                      <div>
+                        <Input
+                          {...register(`subtasks.${index}.title` as const)}
+                          id={`subtask-title-${index}`}
+                          label="Subtask Title"
+                          placeholder="e.g. Build Login, Dashboard and Contacts UI"
+                          required
+                          error={errors.subtasks?.[index]?.title?.message}
+                          disabled={isSaving}
+                        />
+                      </div>
+
+                      {/* Row 3: Work Instructions */}
+                      <div>
+                        <Textarea
+                          {...register(`subtasks.${index}.note` as const)}
+                          id={`subtask-note-${index}`}
+                          label="Work Instructions (Optional)"
+                          placeholder="Specific deliverables, links, or instructions for this member..."
+                          rows={2}
+                          error={errors.subtasks?.[index]?.note?.message}
+                          disabled={isSaving}
+                        />
+                      </div>
+
+                      {/* Row 4: Due Date, Priority, Required */}
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+                        <div>
+                          <Input
+                            {...register(`subtasks.${index}.due` as const)}
+                            id={`subtask-due-${index}`}
+                            type="date"
+                            label="Subtask Due Date"
+                            required
+                            error={errors.subtasks?.[index]?.due?.message}
+                            disabled={isSaving}
+                          />
+                        </div>
+
+                        <div>
+                          <Select
+                            {...register(`subtasks.${index}.priority` as const)}
+                            id={`subtask-priority-${index}`}
+                            label="Priority"
+                            disabled={isSaving}
+                          >
+                            <option value="normal">Normal</option>
+                            <option value="high">High</option>
+                          </Select>
+                        </div>
+
+                        <div className="pb-2">
+                          <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-slate-700 select-none">
+                            <input
+                              type="checkbox"
+                              {...register(`subtasks.${index}.isRequired` as const)}
+                              className="rounded text-brand-blue focus:ring-brand-blue"
+                              disabled={isSaving}
+                            />
+                            <span>Required for Parent Completion</span>
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+
+              {teamMembers.length > 0 && fields.length < teamMembers.length && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    append({
+                      owner: '',
+                      responsibilityLabel: '',
+                      title: '',
+                      note: '',
+                      due: selectedDue || getTodayDateStringKolkata(),
+                      priority: selectedPriority || 'normal',
+                      isRequired: true,
+                    })
+                  }
+                  className="w-full border-dashed"
+                  leftIcon={<Plus className="w-3.5 h-3.5" />}
+                >
+                  + Add Another Member Assignment
+                </Button>
+              )}
+            </div>
+          )}
+
+          {/* =========================================================================
+              SECTION D — OVERALL SCHEDULE & PRIORITY
              ========================================================================= */}
           <div className="space-y-4 pt-2">
             <div className="pb-1 border-b border-slate-100">
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                Section C — Schedule
+                {mode === 'multiple'
+                  ? 'Section D — Overall Schedule & Priority'
+                  : 'Section D — Schedule'}
               </h3>
             </div>
 
-            {/* 7. Due Date & 8. Priority */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Input
                   {...register('due')}
                   id="due"
                   type="date"
-                  label="Due Date"
+                  label={mode === 'multiple' ? 'Overall Parent Due Date' : 'Due Date'}
                   required
                   error={errors.due?.message}
                   disabled={isSaving}

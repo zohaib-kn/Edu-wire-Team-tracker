@@ -17,6 +17,9 @@
     "test:phase5-part1": "tsx src/scripts/test-phase5-part1.ts",
     "test:phase5-part2": "tsx src/scripts/test-phase5-part2.ts",
     "test:phase5-part3": "tsx src/scripts/test-phase5-part3.ts",
+    "test:discussion": "tsx src/scripts/test-task-discussion.ts",
+    "test:discussion-phase3": "tsx src/scripts/test-task-discussion-phase3.ts",
+    "test:multi-assignee": "tsx src/scripts/test-multi-assignee-phase1.ts",
     "workers": "tsx src/workers/index.ts"
   },
   "keywords": [],

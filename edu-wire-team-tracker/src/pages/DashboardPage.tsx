@@ -9,6 +9,8 @@ import {
   CheckCircle2,
   ArrowUpRight,
   Inbox,
+  Layers,
+  List,
 } from 'lucide-react'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { useDashboardSummary } from '@/features/tasks/hooks/useDashboardSummary'
@@ -23,6 +25,7 @@ import { Button } from '@/components/ui/Button'
 import { Spinner } from '@/components/ui/Spinner'
 import { usePageHeader } from '@/context/HeaderContext'
 import { canPerformTaskAction } from '@/features/tasks/utils/taskPermissions'
+import { cn } from '@/lib/utils/cn'
 import type { Task } from '@/features/tasks/types/task.types'
 
 export function DashboardPage() {
@@ -65,6 +68,7 @@ export function DashboardPage() {
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null)
 
   const canCreate = canPerformTaskAction(user, 'create')
+  const isMember = user?.role === 'Member'
   // Show branch filter if user is Super Admin or has multiple branches available
   const showBranchFilter = user?.role === 'Super Admin' || branches.length > 1
 
@@ -102,22 +106,49 @@ export function DashboardPage() {
     setIsSheetOpen(true)
   }
 
+  // View mode: 'grouped' (nest subtasks inside parent tasks) vs 'flat' (show every subtask as an individual card)
+  const [viewMode, setViewMode] = useState<'grouped' | 'flat'>('grouped')
+
   // Filter tasks into columns
   const allTasks = useMemo(() => tasksData?.tasks || [], [tasksData?.tasks])
 
+  const boardTasks = useMemo(() => {
+    // If user is a Member, directly display their assigned tasks without hiding subtasks
+    if (isMember) {
+      return allTasks
+    }
+    // For Managers (Super Admin, Branch Admin, Team Lead):
+    // In 'flat' mode, show all individual cards
+    if (viewMode === 'flat') {
+      return allTasks
+    }
+    // In 'grouped' mode, only hide a subtask if its parent task is actually present on the board
+    const parentIds = new Set(allTasks.filter((t) => t.taskLevel === 'parent').map((t) => t.id))
+    return allTasks.filter((t) => {
+      if (t.taskLevel === 'subtask') {
+        const pId =
+          typeof t.parentTask === 'object' && t.parentTask
+            ? (t.parentTask as any).id
+            : t.parentTaskId || (t.parentTask as any)
+        return !pId || !parentIds.has(pId)
+      }
+      return true
+    })
+  }, [allTasks, isMember, viewMode])
+
   const todoTasks = useMemo(
-    () => allTasks.filter((t) => t.status === 'todo'),
-    [allTasks],
+    () => boardTasks.filter((t) => t.status === 'todo'),
+    [boardTasks],
   )
 
   const inProgressTasks = useMemo(
-    () => allTasks.filter((t) => t.status === 'doing'),
-    [allTasks],
+    () => boardTasks.filter((t) => t.status === 'doing'),
+    [boardTasks],
   )
 
   const completedTasks = useMemo(
-    () => allTasks.filter((t) => t.status === 'done'),
-    [allTasks],
+    () => boardTasks.filter((t) => t.status === 'done'),
+    [boardTasks],
   )
 
   // Configure Top Header via usePageHeader
@@ -177,8 +208,8 @@ export function DashboardPage() {
         />
       </section>
 
-      {/* 3. Section Heading */}
-      <div className="flex items-center justify-between">
+      {/* 3. Section Heading & View Switcher */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-2.5">
           <Columns3 className="w-5 h-5 text-text-primary" strokeWidth={1.75} />
           <h2 className="text-lg sm:text-xl font-bold text-text-primary tracking-tight">
@@ -186,13 +217,49 @@ export function DashboardPage() {
           </h2>
         </div>
 
-        <Link
-          to="/history"
-          className="text-xs font-semibold text-brand-blue hover:text-brand-blue-hover flex items-center gap-1.5 transition-colors px-3 py-1.5 rounded-nav hover:bg-brand-blue-light"
-        >
-          <span>Full History Archive</span>
-          <ArrowUpRight className="w-3.5 h-3.5" />
-        </Link>
+        <div className="flex items-center gap-3">
+          {/* Grouped Projects vs All Tasks Flat Switcher (Only visible to Managers / Super Admin / Team Lead) */}
+          {!isMember && (
+            <div className="flex items-center bg-slate-100 p-0.5 rounded-full border border-border-subtle text-xs">
+              <button
+                type="button"
+                onClick={() => setViewMode('grouped')}
+                className={cn(
+                  'flex items-center gap-1.5 px-3 py-1 rounded-full font-semibold transition-all cursor-pointer',
+                  viewMode === 'grouped'
+                    ? 'bg-white text-brand-blue shadow-xs'
+                    : 'text-text-muted hover:text-text-primary',
+                )}
+                title="Group subtasks inside their parent project card"
+              >
+                <Layers className="w-3.5 h-3.5" />
+                <span>Grouped Projects</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('flat')}
+                className={cn(
+                  'flex items-center gap-1.5 px-3 py-1 rounded-full font-semibold transition-all cursor-pointer',
+                  viewMode === 'flat'
+                    ? 'bg-white text-brand-blue shadow-xs'
+                    : 'text-text-muted hover:text-text-primary',
+                )}
+                title="Show all individual tasks and subtasks as separate cards"
+              >
+                <List className="w-3.5 h-3.5" />
+                <span>All Tasks Flat</span>
+              </button>
+            </div>
+          )}
+
+          <Link
+            to="/history"
+            className="text-xs font-semibold text-brand-blue hover:text-brand-blue-hover flex items-center gap-1.5 transition-colors px-3 py-1.5 rounded-nav hover:bg-brand-blue-light"
+          >
+            <span>Full History Archive</span>
+            <ArrowUpRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
       </div>
 
       {/* 4. 3-Column Kanban Board */}

@@ -1,5 +1,38 @@
 export type TaskStatus = 'todo' | 'doing' | 'done'
 export type TaskPriority = 'normal' | 'high'
+export type TaskLevel = 'standalone' | 'parent' | 'subtask'
+
+export interface SubtaskItem {
+  id: string
+  title: string
+  owner: string
+  ownerId: string
+  responsibilityLabel?: string | null
+  note?: string
+  due: string
+  priority: TaskPriority
+  status: TaskStatus
+  isRequired: boolean
+  doneAt?: string | null
+  createdAt?: string
+}
+
+export interface TaskProgressSummary {
+  totalSubtasks: number
+  completedSubtasks: number
+  pendingSubtasks: number
+  requiredSubtasks: number
+  completedRequiredSubtasks: number
+  progressPercentage: number
+}
+
+export interface ParentTaskRef {
+  id: string
+  title: string
+  due: string
+  priority: TaskPriority
+  status: TaskStatus
+}
 
 export interface Task {
   id: string
@@ -18,6 +51,13 @@ export interface Task {
   due: string // YYYY-MM-DD
   priority: TaskPriority
   status: TaskStatus
+  taskLevel?: TaskLevel
+  parentTask?: ParentTaskRef | string | null
+  parentTaskId?: string | null
+  responsibilityLabel?: string | null
+  isRequired?: boolean
+  subtasks?: SubtaskItem[]
+  progress?: TaskProgressSummary
   doneAt?: string | null
   deletedAt?: string | null
   createdAt?: string
@@ -77,15 +117,38 @@ export interface TasksListResponse {
   totalPages?: number
 }
 
+export interface SubtaskInputPayload {
+  title: string
+  owner: string
+  responsibilityLabel?: string
+  note?: string
+  due?: string
+  priority?: TaskPriority
+  isRequired?: boolean
+}
+
 export interface CreateTaskPayload {
   title: string
   team: string
   branch?: string
-  owner: string
+  owner?: string
   reportingManager?: string
   due: string // YYYY-MM-DD
   priority: TaskPriority
   note?: string
+  responsibilityLabel?: string
+  isRequired?: boolean
+  subtasks?: SubtaskInputPayload[]
+}
+
+export interface CreateSubtaskPayload {
+  title: string
+  owner: string
+  responsibilityLabel?: string
+  note?: string
+  due?: string
+  priority?: TaskPriority
+  isRequired?: boolean
 }
 
 export interface UpdateTaskPayload {

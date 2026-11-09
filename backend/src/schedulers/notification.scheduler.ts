@@ -79,10 +79,11 @@ export const notificationScheduler = {
   async dispatchDueTodayReminders(customDateIST?: string): Promise<{ dispatched: number; skipped: number }> {
     const todayIST = customDateIST || getTodayDateIST()
 
-    // Query active, incomplete tasks due today
+    // Query active, incomplete actionable tasks due today (exclude parent coordination containers)
     const tasks = await Task.find({
       due: todayIST,
       status: { $in: ['todo', 'doing'] },
+      taskLevel: { $ne: 'parent' },
       deletedAt: null,
     })
       .populate<{ owner: IUser }>('owner')
@@ -251,10 +252,11 @@ export const notificationScheduler = {
   async dispatchOverdueReminders(customDateIST?: string): Promise<{ dispatched: number; skipped: number }> {
     const todayIST = customDateIST || getTodayDateIST()
 
-    // Incomplete tasks where due < todayIST
+    // Incomplete actionable tasks where due < todayIST (exclude parent coordination containers)
     const overdueTasks = await Task.find({
       due: { $lt: todayIST },
       status: { $in: ['todo', 'doing'] },
+      taskLevel: { $ne: 'parent' },
       deletedAt: null,
     })
       .populate<{ owner: IUser }>('owner')

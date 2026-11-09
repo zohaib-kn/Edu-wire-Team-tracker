@@ -43,7 +43,8 @@ export function TaskStatusSelect({
   const [isOpen, setIsOpen] = useState(false)
   const updateStatusMutation = useUpdateTaskStatus()
 
-  const isPermitted = canPerformTaskAction(user, 'status', task)
+  const isParent = task.taskLevel === 'parent'
+  const isPermitted = canPerformTaskAction(user, 'status', task) && !isParent
   const isUpdating = updateStatusMutation.isPending && updateStatusMutation.variables?.id === task.id
   const canChange = isPermitted && !disabled && !isUpdating
 
@@ -62,6 +63,7 @@ export function TaskStatusSelect({
   if (!canChange && !isUpdating) {
     return (
       <span
+        title={isParent ? 'Status derived automatically from subtasks' : undefined}
         className={cn(
           'inline-flex items-center gap-1.5 rounded-badge font-semibold border select-none',
           size === 'sm' ? 'px-2 py-0.5 text-[11px]' : 'px-2.5 py-1 text-xs',

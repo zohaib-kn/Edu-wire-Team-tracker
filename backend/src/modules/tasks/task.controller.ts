@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from 'express'
 import { taskService } from './task.service.js'
 import {
+  createSubtaskSchema,
   createTaskSchema,
   taskQuerySchema,
   updateTaskSchema,
@@ -26,6 +27,30 @@ export const taskController = {
         success: true,
         data: task,
         task,
+      })
+    } catch (error) {
+      next(error)
+    }
+  },
+
+  /**
+   * POST /api/v1/tasks/:id/subtasks
+   * Add a subtask to an existing task
+   */
+  async createSubtask(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.user) {
+        throw AppError.unauthorized('Authentication required', 'UNAUTHORIZED')
+      }
+
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id
+      const validated = createSubtaskSchema.parse(req.body)
+      const subtask = await taskService.createSubtask(id, validated, req.user)
+
+      res.status(201).json({
+        success: true,
+        data: subtask,
+        task: subtask,
       })
     } catch (error) {
       next(error)

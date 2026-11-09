@@ -11,10 +11,43 @@ import { AppError } from '../../utils/AppError.js'
 import { getTodayDateIST } from '../../utils/dateUtils.js'
 import type { AuthenticatedUserContext } from '../../types/auth.types.js'
 import type {
+  CreateSubtaskInput,
   CreateTaskInput,
   TaskQueryInput,
   UpdateTaskInput,
 } from './task.schemas.js'
+
+export interface FormattedSubtaskItem {
+  id: string
+  title: string
+  owner: string
+  ownerId: string
+  responsibilityLabel?: string | null
+  note?: string
+  due: string
+  priority: 'normal' | 'high'
+  status: 'todo' | 'doing' | 'done'
+  isRequired: boolean
+  doneAt?: string | null
+  createdAt?: string
+}
+
+export interface TaskProgressSummary {
+  totalSubtasks: number
+  completedSubtasks: number
+  pendingSubtasks: number
+  requiredSubtasks: number
+  completedRequiredSubtasks: number
+  progressPercentage: number
+}
+
+export interface FormattedParentRef {
+  id: string
+  title: string
+  due: string
+  priority: 'normal' | 'high'
+  status: 'todo' | 'doing' | 'done'
+}
 
 export interface FormattedTask {
   id: string
@@ -33,6 +66,13 @@ export interface FormattedTask {
   due: string
   priority: 'normal' | 'high'
   status: 'todo' | 'doing' | 'done'
+  taskLevel: 'standalone' | 'parent' | 'subtask'
+  parentTask?: FormattedParentRef | string | null
+  parentTaskId?: string | null
+  responsibilityLabel?: string | null
+  isRequired?: boolean
+  subtasks?: FormattedSubtaskItem[]
+  progress?: TaskProgressSummary
   doneAt?: string | null
   deletedAt?: string | null
   createdAt?: string
@@ -53,6 +93,147 @@ export interface FormattedActivity {
 
 function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function getParentTaskId(parentTask: any): mongoose.Types.ObjectId | null {
+  if (!parentTask) return null
+  if (parentTask._id) return parentTask._id
+  if (mongoose.Types.ObjectId.isValid(parentTask)) {
+    return new mongoose.Types.ObjectId(parentTask)
+  }
+  return null
+}
+
+export function calculateTaskProgress(subtasks: ITask[]): TaskProgressSummary {
+  const nonDeleted = subtasks.filter((s) => s.deletedAt === null)
+  const totalSubtasks = nonDeleted.length
+  const completedSubtasks = nonDeleted.filter((s) => s.status === 'done').length
+  const pendingSubtasks = totalSubtasks - completedSubtasks
+
+  const requiredList = nonDeleted.filter((s) => s.isRequired !== false)
+  const requiredSubtasks = requiredList.length
+  const completedRequiredSubtasks = requiredList.filter((s) => s.status === 'done').length
+
+  let progressPercentage = 0
+  if (requiredSubtasks > 0) {
+    progressPercentage = Math.round((completedRequiredSubtasks / requiredSubtasks) * 100)
+  } else if (totalSubtasks > 0) {
+    progressPercentage = Math.round((completedSubtasks / totalSubtasks) * 100)
+  }
+
+  return {
+    totalSubtasks,
+    completedSubtasks,
+    pendingSubtasks,
+    requiredSubtasks,
+    completedRequiredSubtasks,
+    progressPercentage,
+  }
+}
+
+export async function syncParentStatusFromSubtasks(
+  parentTaskId: string | mongoose.Types.ObjectId,
+  session?: mongoose.ClientSession,
+): Promise<ITask | null> {
+  const parent = await Task.findById(parentTaskId).session(session || null).exec()
+  if (!parent || parent.deletedAt !== null) return null
+
+  const subtasks = await Task.find({
+    parentTask: parent._id,
+    deletedAt: null,
+  })
+    .session(session || null)
+    .exec()
+
+  if (subtasks.length === 0) {
+    return parent
+  }
+
+  const requiredSubtasks = subtasks.filter((s) => s.isRequired !== false)
+
+  let targetStatus: 'todo' | 'doing' | 'done' = 'todo'
+  let targetDoneAt: Date | null = null
+
+  if (requiredSubtasks.length === 0) {
+    // If zero required subtasks, do not let parent become Done automatically
+    const anyStarted = subtasks.some((s) => s.status === 'doing' || s.status === 'done')
+    targetStatus = anyStarted ? 'doing' : 'todo'
+    targetDoneAt = null
+  } else {
+    const allRequiredDone = requiredSubtasks.every((s) => s.status === 'done')
+    const anyRequiredStarted = requiredSubtasks.some((s) => s.status === 'doing' || s.status === 'done')
+
+    if (allRequiredDone) {
+      targetStatus = 'done'
+      targetDoneAt = parent.doneAt || new Date()
+    } else if (anyRequiredStarted) {
+      targetStatus = 'doing'
+      targetDoneAt = null
+    } else {
+      targetStatus = 'todo'
+      targetDoneAt = null
+    }
+  }
+
+  const oldStatus = parent.status
+  if (oldStatus !== targetStatus) {
+    parent.status = targetStatus
+    parent.doneAt = targetDoneAt
+    await parent.save({ session })
+
+    const creatorId =
+      parent.createdBy && typeof parent.createdBy === 'object' && '_id' in (parent.createdBy as any)
+        ? (parent.createdBy as any)._id
+        : parent.createdBy
+
+    await Activity.create({
+      task: parent._id,
+      user: creatorId,
+      action: 'status_changed',
+      from: oldStatus,
+      to: targetStatus,
+      at: new Date(),
+    })
+
+    if (targetStatus === 'done' && oldStatus !== 'done') {
+      try {
+        const creatorDoc = (await User.findById(parent.createdBy).exec()) as any
+        await notificationService.handleTaskCompleted(parent, {
+          id: parent.createdBy.toString(),
+          name: creatorDoc?.name || 'System',
+        })
+      } catch (notifErr: any) {
+        console.warn('[PARENT_SYNC] Notification warning on task completion:', notifErr.message)
+      }
+    }
+  }
+
+  return parent
+}
+
+function formatSubtaskItem(subtask: ITask): FormattedSubtaskItem {
+  const ownerDoc = subtask.owner as unknown as IUser
+  const ownerName = ownerDoc && typeof ownerDoc === 'object' && 'name' in ownerDoc
+    ? ownerDoc.name
+    : subtask.owner?.toString() || 'Unassigned'
+  const ownerId = ownerDoc && typeof ownerDoc === 'object' && '_id' in ownerDoc
+    ? ownerDoc._id.toString()
+    : subtask.owner?.toString() || ''
+
+  return {
+    id: subtask._id.toString(),
+    title: subtask.title,
+    owner: ownerName,
+    ownerId,
+    responsibilityLabel: subtask.responsibilityLabel || null,
+    note: subtask.note || '',
+    due: subtask.due,
+    priority: subtask.priority,
+    status: subtask.status,
+    isRequired: subtask.isRequired !== false,
+    doneAt: subtask.doneAt ? subtask.doneAt.toISOString() : null,
+    createdAt: subtask.createdAt ? subtask.createdAt.toISOString() : undefined,
+  }
 }
 
 function formatActivity(activity: IActivity): FormattedActivity {
@@ -88,7 +269,7 @@ function formatActivity(activity: IActivity): FormattedActivity {
   }
 }
 
-function formatTask(task: ITask, activities?: IActivity[]): FormattedTask {
+function formatTask(task: ITask, activities?: IActivity[], subtasks?: ITask[]): FormattedTask {
   const teamDoc = task.team as unknown as ITeam
   const branchDoc = task.branch as unknown as IBranch
   const ownerDoc = task.owner as unknown as IUser
@@ -119,6 +300,36 @@ function formatTask(task: ITask, activities?: IActivity[]): FormattedTask {
     ? creatorDoc.name
     : task.createdBy?.toString() || 'System'
 
+  const taskLevel = task.taskLevel || (task.parentTask ? 'subtask' : 'standalone')
+
+  let parentTaskRef: FormattedParentRef | string | null = null
+  let parentTaskId: string | null = null
+
+  if (task.parentTask) {
+    const p: any = task.parentTask
+    const pid: string = p && p._id ? p._id.toString() : String(p)
+    parentTaskId = pid
+    if (p && typeof p === 'object' && 'title' in p) {
+      parentTaskRef = {
+        id: pid,
+        title: p.title || 'Parent Task',
+        due: p.due || '',
+        priority: p.priority || 'normal',
+        status: p.status || 'todo',
+      }
+    } else {
+      parentTaskRef = pid
+    }
+  }
+
+  let formattedSubtasks: FormattedSubtaskItem[] | undefined
+  let progress: TaskProgressSummary | undefined
+
+  if (taskLevel === 'parent' || (subtasks && subtasks.length > 0)) {
+    formattedSubtasks = (subtasks || []).map(formatSubtaskItem)
+    progress = calculateTaskProgress(subtasks || [])
+  }
+
   return {
     id: task._id.toString(),
     title: task.title,
@@ -136,6 +347,13 @@ function formatTask(task: ITask, activities?: IActivity[]): FormattedTask {
     due: task.due,
     priority: task.priority,
     status: task.status,
+    taskLevel,
+    parentTask: parentTaskRef,
+    parentTaskId,
+    responsibilityLabel: task.responsibilityLabel || null,
+    isRequired: task.isRequired !== false,
+    subtasks: formattedSubtasks,
+    progress,
     doneAt: task.doneAt ? task.doneAt.toISOString() : null,
     deletedAt: task.deletedAt ? task.deletedAt.toISOString() : null,
     createdAt: task.createdAt ? task.createdAt.toISOString() : undefined,
@@ -147,13 +365,14 @@ function formatTask(task: ITask, activities?: IActivity[]): FormattedTask {
 export const taskService = {
   /**
    * Creates a new task with strict scope and assignment validation.
+   * Supports both standalone single-assignee tasks and multi-assignee parent tasks.
    */
   async createTask(
     input: CreateTaskInput,
     user: AuthenticatedUserContext,
   ): Promise<FormattedTask> {
     // 1. Resolve Team
-    let teamDoc: (ITeam & { _id: mongoose.Types.ObjectId }) | null = null
+    let teamDoc: (ITeam & { _id: mongoose.Types.ObjectId; branch: any }) | null = null
     if (mongoose.Types.ObjectId.isValid(input.team)) {
       teamDoc = (await Team.findById(input.team).exec()) as any
     }
@@ -164,53 +383,8 @@ export const taskService = {
       throw AppError.badRequest('Selected team does not exist or is inactive', 'TEAM_NOT_FOUND')
     }
 
-    // 2. Resolve Owner
-    let ownerDoc: (IUser & { _id: mongoose.Types.ObjectId }) | null = null
-    if (mongoose.Types.ObjectId.isValid(input.owner)) {
-      ownerDoc = (await User.findById(input.owner).exec()) as any
-    }
-    if (!ownerDoc) {
-      ownerDoc = (await User.findOne({
-        $or: [
-          { email: input.owner.toLowerCase() },
-          { name: input.owner },
-        ],
-      }).exec()) as any
-    }
-    if (!ownerDoc || !ownerDoc.isActive) {
-      throw AppError.badRequest('Selected task owner does not exist or is inactive', 'OWNER_NOT_FOUND')
-    }
-
-    // 3. Verify Owner belongs to Team
-    const belongsToTeam =
-      ownerDoc.teams &&
-      ownerDoc.teams.some((t) => t.toString() === teamDoc!._id.toString())
-
-    if (!belongsToTeam && user.role !== 'Super Admin') {
-      // If user is not yet associated with team, ensure owner belongs to selected team
-      throw AppError.badRequest(
-        `Selected owner '${ownerDoc.name}' does not belong to team '${teamDoc.name}'`,
-        'INVALID_TEAM_ASSIGNMENT',
-      )
-    }
-
-    // 4. Verify user has task.create authorization for this scope
-    const isAuthorized = permissionsService.can(user, 'task.create', {
-      teamId: teamDoc._id,
-      branchId: teamDoc.branch,
-      ownerId: ownerDoc._id,
-      createdById: user.id,
-    })
-
-    if (!isAuthorized) {
-      throw AppError.forbidden(
-        'You do not have permission to create or assign tasks for this team or owner.',
-        'INSUFFICIENT_SCOPE',
-      )
-    }
-
-    // 5. Resolve Team Lead / Default Reporting Manager for teamDoc
-    let defaultTeamLead: (IUser & { _id: mongoose.Types.ObjectId; role: any }) | null = null
+    // 2. Resolve Team Lead / Default Reporting Manager for teamDoc
+    let defaultTeamLead: (IUser & { _id: mongoose.Types.ObjectId; role: any; branch: any }) | null = null
     if (teamDoc.lead) {
       defaultTeamLead = (await User.findById(teamDoc.lead).populate('role').exec()) as any
       if (defaultTeamLead && !defaultTeamLead.isActive) {
@@ -228,12 +402,13 @@ export const taskService = {
       }
     }
 
-    // 6. Resolve final Reporting Manager
+    // 3. Resolve final Reporting Manager
     let finalReportingManagerId: mongoose.Types.ObjectId | null = null
+    let reportingManagerDoc: (IUser & { _id: mongoose.Types.ObjectId; role: any; branch: any }) | null = null
 
     if (input.reportingManager && input.reportingManager.trim()) {
       const requested = input.reportingManager.trim()
-      let candidateManager: (IUser & { _id: mongoose.Types.ObjectId; role: any }) | null = null
+      let candidateManager: (IUser & { _id: mongoose.Types.ObjectId; role: any; branch: any }) | null = null
       if (mongoose.Types.ObjectId.isValid(requested)) {
         candidateManager = (await User.findById(requested).populate('role').exec()) as any
       }
@@ -267,11 +442,6 @@ export const taskService = {
         throw AppError.badRequest('Reporting manager must belong to the same branch as the task', 'MANAGER_BRANCH_MISMATCH')
       }
 
-      // Self-reporting check
-      if (candidateManager._id.toString() === ownerDoc._id.toString()) {
-        throw AppError.badRequest('An employee cannot be assigned as their own reporting manager', 'SELF_REPORTING_NOT_ALLOWED')
-      }
-
       // Supervisory eligibility check
       const candidateRole = candidateManager.role as unknown as IRole
       const roleName = candidateRole && typeof candidateRole === 'object' && 'name' in candidateRole ? candidateRole.name : ''
@@ -280,16 +450,12 @@ export const taskService = {
       }
 
       finalReportingManagerId = candidateManager._id
+      reportingManagerDoc = candidateManager
     } else {
       // Default: use team lead
       if (defaultTeamLead && defaultTeamLead.isActive) {
-        if (defaultTeamLead._id.toString() === ownerDoc._id.toString()) {
-          throw AppError.badRequest(
-            'The team lead is the owner of this task. Please select another eligible reporting manager.',
-            'SELF_REPORTING_NOT_ALLOWED',
-          )
-        }
         finalReportingManagerId = defaultTeamLead._id
+        reportingManagerDoc = defaultTeamLead
       } else {
         throw AppError.badRequest(
           'Selected team does not have an active Team Lead. Please select an eligible reporting manager.',
@@ -298,21 +464,294 @@ export const taskService = {
       }
     }
 
-    // 7. Create task in MongoDB
+    // ----------------------------------------------------
+    // BRANCH A: MULTI-ASSIGNEE PARENT TASK CREATION
+    // ----------------------------------------------------
+    if (input.subtasks && input.subtasks.length > 0) {
+      // Resolve Parent Task Owner (backward-compatible: defaults to reporting manager or current user)
+      let parentOwnerDoc: (IUser & { _id: mongoose.Types.ObjectId }) | null = null
+      if (input.owner && input.owner.trim()) {
+        if (mongoose.Types.ObjectId.isValid(input.owner)) {
+          parentOwnerDoc = (await User.findById(input.owner).exec()) as any
+        }
+        if (!parentOwnerDoc) {
+          parentOwnerDoc = (await User.findOne({
+            $or: [{ email: input.owner.toLowerCase() }, { name: input.owner }],
+          }).exec()) as any
+        }
+      }
+      if (!parentOwnerDoc && reportingManagerDoc) {
+        parentOwnerDoc = reportingManagerDoc
+      }
+      if (!parentOwnerDoc) {
+        parentOwnerDoc = (await User.findById(user.id).exec()) as any
+      }
+      if (!parentOwnerDoc || !parentOwnerDoc.isActive) {
+        throw AppError.badRequest('Unable to resolve active parent task owner', 'PARENT_OWNER_REQUIRED')
+      }
+
+      // Verify user has task.create authorization for parent
+      const isAuthorized = permissionsService.can(user, 'task.create', {
+        teamId: teamDoc._id,
+        branchId: teamDoc.branch,
+        ownerId: parentOwnerDoc._id,
+        createdById: user.id,
+      })
+      if (!isAuthorized) {
+        throw AppError.forbidden(
+          'You do not have permission to create or assign tasks for this team.',
+          'INSUFFICIENT_SCOPE',
+        )
+      }
+
+      // Pre-validate all subtasks before creating any records
+      const seenAssignees = new Set<string>()
+      const resolvedSubtasks: Array<{
+        title: string
+        note?: string
+        due: string
+        priority: 'normal' | 'high'
+        responsibilityLabel?: string | null
+        isRequired: boolean
+        ownerDoc: IUser & { _id: mongoose.Types.ObjectId }
+      }> = []
+
+      for (const st of input.subtasks) {
+        let subOwner: (IUser & { _id: mongoose.Types.ObjectId; branch: any; teams: any }) | null = null
+        if (mongoose.Types.ObjectId.isValid(st.owner)) {
+          subOwner = (await User.findById(st.owner).exec()) as any
+        }
+        if (!subOwner) {
+          subOwner = (await User.findOne({
+            $or: [{ email: st.owner.toLowerCase() }, { name: st.owner }],
+          }).exec()) as any
+        }
+        if (!subOwner || !subOwner.isActive) {
+          throw AppError.badRequest(`Subtask assignee '${st.owner}' does not exist or is inactive`, 'SUBTASK_OWNER_NOT_FOUND')
+        }
+
+        // Verify Owner belongs to parent's Team
+        const belongsToTeam =
+          subOwner.teams &&
+          subOwner.teams.some((t: any) => t.toString() === teamDoc!._id.toString())
+        if (!belongsToTeam && user.role !== 'Super Admin') {
+          throw AppError.badRequest(
+            `Subtask assignee '${subOwner.name}' does not belong to team '${teamDoc.name}'`,
+            'INVALID_TEAM_ASSIGNMENT',
+          )
+        }
+
+        // Verify Owner belongs to same Branch as team
+        const subOwnerBranchId = subOwner.branch
+          ? (subOwner.branch._id ? subOwner.branch._id.toString() : subOwner.branch.toString())
+          : ''
+        const teamBranchId = teamDoc.branch
+          ? (teamDoc.branch._id ? teamDoc.branch._id.toString() : teamDoc.branch.toString())
+          : ''
+        if (subOwnerBranchId && teamBranchId && subOwnerBranchId !== teamBranchId) {
+          throw AppError.badRequest(
+            `Subtask assignee '${subOwner.name}' does not belong to the same branch as the team`,
+            'CROSS_BRANCH_ASSIGNMENT',
+          )
+        }
+
+        // Check duplicate assignee under this parent in V1 workflow
+        const subOwnerIdStr = subOwner._id.toString()
+        if (seenAssignees.has(subOwnerIdStr)) {
+          throw AppError.badRequest(
+            'Duplicate subtask assignees are not allowed under the same parent task',
+            'DUPLICATE_SUBTASK_ASSIGNEE',
+          )
+        }
+        seenAssignees.add(subOwnerIdStr)
+
+        resolvedSubtasks.push({
+          title: st.title,
+          note: st.note || '',
+          due: st.due || input.due,
+          priority: st.priority || input.priority || 'normal',
+          responsibilityLabel: st.responsibilityLabel || null,
+          isRequired: st.isRequired !== false,
+          ownerDoc: subOwner,
+        })
+      }
+
+      // Atomic Creation with Rollback
+      let parentTask: ITask | null = null
+      const createdSubtasks: ITask[] = []
+
+      try {
+        parentTask = await Task.create({
+          title: input.title,
+          note: input.note || '',
+          team: teamDoc._id,
+          branch: teamDoc.branch,
+          owner: parentOwnerDoc._id,
+          reportingManager: finalReportingManagerId,
+          createdBy: user.id,
+          due: input.due,
+          priority: input.priority || 'normal',
+          status: 'todo',
+          taskLevel: 'parent',
+          parentTask: null,
+          responsibilityLabel: input.responsibilityLabel || null,
+          isRequired: input.isRequired !== false,
+        })
+
+        await Activity.create({
+          task: parentTask._id,
+          user: user.id,
+          action: 'created',
+          at: new Date(),
+        })
+
+        for (const st of resolvedSubtasks) {
+          const subtask = await Task.create({
+            title: st.title,
+            note: st.note || '',
+            team: teamDoc._id,
+            branch: teamDoc.branch,
+            owner: st.ownerDoc._id,
+            reportingManager: finalReportingManagerId,
+            createdBy: user.id,
+            due: st.due,
+            priority: st.priority,
+            status: 'todo',
+            taskLevel: 'subtask',
+            parentTask: parentTask._id,
+            responsibilityLabel: st.responsibilityLabel,
+            isRequired: st.isRequired,
+          })
+
+          createdSubtasks.push(subtask)
+
+          await Activity.create({
+            task: subtask._id,
+            user: user.id,
+            action: 'created',
+            at: new Date(),
+          })
+        }
+
+        // Recalculate parent status from subtasks
+        await syncParentStatusFromSubtasks(parentTask._id)
+
+        // Notifications: Assignees receive individual subtask alerts; Reporting Manager receives overall supervision alert
+        try {
+          await notificationService.handleParentTaskCreated(parentTask, createdSubtasks, user)
+        } catch (notifErr: any) {
+          console.warn('[TASK_SERVICE] Parent task notification warning:', notifErr.message)
+        }
+      } catch (creationError) {
+        // Rollback created documents
+        if (parentTask) {
+          try {
+            const taskIdsToDelete = [parentTask._id, ...createdSubtasks.map((s) => s._id)]
+            await Task.deleteMany({ _id: { $in: taskIdsToDelete } })
+            await Activity.deleteMany({ task: { $in: taskIdsToDelete } })
+          } catch (cleanupErr) {
+            console.error('[TASK_SERVICE] Rollback cleanup error:', cleanupErr)
+          }
+        }
+        throw creationError
+      }
+
+      // Populate and return parent with subtasks
+      const populatedParent = await Task.findById(parentTask._id)
+        .populate('team')
+        .populate('branch')
+        .populate('owner')
+        .populate('reportingManager')
+        .populate('createdBy')
+        .exec()
+
+      const populatedSubtasks = await Task.find({
+        parentTask: parentTask._id,
+        deletedAt: null,
+      })
+        .populate('owner')
+        .exec()
+
+      return formatTask(populatedParent!, undefined, populatedSubtasks)
+    }
+
+    // ----------------------------------------------------
+    // BRANCH B: STANDALONE SINGLE-ASSIGNEE TASK CREATION
+    // ----------------------------------------------------
+    if (!input.owner || !input.owner.trim()) {
+      throw AppError.badRequest('Assigned owner is required for standalone tasks', 'OWNER_REQUIRED')
+    }
+
+    let ownerDoc: (IUser & { _id: mongoose.Types.ObjectId }) | null = null
+    if (mongoose.Types.ObjectId.isValid(input.owner)) {
+      ownerDoc = (await User.findById(input.owner).exec()) as any
+    }
+    if (!ownerDoc) {
+      ownerDoc = (await User.findOne({
+        $or: [
+          { email: input.owner.toLowerCase() },
+          { name: input.owner },
+        ],
+      }).exec()) as any
+    }
+    if (!ownerDoc || !ownerDoc.isActive) {
+      throw AppError.badRequest('Selected task owner does not exist or is inactive', 'OWNER_NOT_FOUND')
+    }
+
+    // Verify Owner belongs to Team
+    const belongsToTeam =
+      ownerDoc.teams &&
+      ownerDoc.teams.some((t) => t.toString() === teamDoc!._id.toString())
+
+    if (!belongsToTeam && user.role !== 'Super Admin') {
+      throw AppError.badRequest(
+        `Selected owner '${ownerDoc.name}' does not belong to team '${teamDoc.name}'`,
+        'INVALID_TEAM_ASSIGNMENT',
+      )
+    }
+
+    // Self-reporting check for standalone tasks
+    if (finalReportingManagerId && finalReportingManagerId.toString() === ownerDoc._id.toString()) {
+      throw AppError.badRequest(
+        'An employee cannot be assigned as their own reporting manager',
+        'SELF_REPORTING_NOT_ALLOWED',
+      )
+    }
+
+    // Verify user has task.create authorization for this scope
+    const isAuthorized = permissionsService.can(user, 'task.create', {
+      teamId: teamDoc._id,
+      branchId: teamDoc.branch,
+      ownerId: ownerDoc._id,
+      createdById: user.id,
+    })
+
+    if (!isAuthorized) {
+      throw AppError.forbidden(
+        'You do not have permission to create or assign tasks for this team or owner.',
+        'INSUFFICIENT_SCOPE',
+      )
+    }
+
+    // Create standalone task in MongoDB
     const newTask = await Task.create({
       title: input.title,
       note: input.note || '',
       team: teamDoc._id,
-      branch: teamDoc.branch, // Derived from team, never trusted from client
+      branch: teamDoc.branch,
       owner: ownerDoc._id,
       reportingManager: finalReportingManagerId,
-      createdBy: user.id, // Derived from authenticated user
+      createdBy: user.id,
       due: input.due,
       priority: input.priority || 'normal',
       status: 'todo',
+      taskLevel: 'standalone',
+      parentTask: null,
+      responsibilityLabel: input.responsibilityLabel || null,
+      isRequired: input.isRequired !== false,
     })
 
-    // 8. Record Activity
+    // Record Activity
     await Activity.create({
       task: newTask._id,
       user: user.id,
@@ -327,13 +766,169 @@ export const taskService = {
       console.warn('[TASK_SERVICE] Notification queue warning on task creation:', notifErr.message)
     }
 
-    // 9. Populate and return
+    // Populate and return
     const populated = await Task.findById(newTask._id)
       .populate('team')
       .populate('branch')
       .populate('owner')
       .populate('reportingManager')
       .populate('createdBy')
+      .exec()
+
+    return formatTask(populated!)
+  },
+
+  /**
+   * Adds an individual subtask to an existing task.
+   * Promotes standalone task to parent task if necessary.
+   */
+  async createSubtask(
+    parentTaskId: string,
+    input: CreateSubtaskInput,
+    user: AuthenticatedUserContext,
+  ): Promise<FormattedTask> {
+    if (!mongoose.Types.ObjectId.isValid(parentTaskId)) {
+      throw AppError.notFound('Invalid parent task ID', 'TASK_NOT_FOUND')
+    }
+
+    const parent = await Task.findOne({ _id: parentTaskId, deletedAt: null }).exec()
+    if (!parent) {
+      throw AppError.notFound('Parent task not found', 'TASK_NOT_FOUND')
+    }
+
+    if (parent.parentTask || parent.taskLevel === 'subtask') {
+      throw AppError.badRequest(
+        'Nested subtasks are not supported. Cannot add a subtask to another subtask.',
+        'NESTED_SUBTASKS_NOT_SUPPORTED',
+      )
+    }
+
+    // Permission check: user must have task.create for parent's scope
+    const isAuthorized = permissionsService.can(user, 'task.create', {
+      teamId: parent.team,
+      branchId: parent.branch,
+      reportingManagerId: parent.reportingManager,
+      createdById: parent.createdBy,
+    })
+
+    if (!isAuthorized) {
+      throw AppError.forbidden(
+        'You do not have permission to add subtasks to this task.',
+        'FORBIDDEN',
+      )
+    }
+
+    // Resolve Subtask Owner
+    let ownerDoc: (IUser & { _id: mongoose.Types.ObjectId; branch: any; teams: any }) | null = null
+    if (mongoose.Types.ObjectId.isValid(input.owner)) {
+      ownerDoc = (await User.findById(input.owner).exec()) as any
+    }
+    if (!ownerDoc) {
+      ownerDoc = (await User.findOne({
+        $or: [{ email: input.owner.toLowerCase() }, { name: input.owner }],
+      }).exec()) as any
+    }
+    if (!ownerDoc || !ownerDoc.isActive) {
+      throw AppError.badRequest('Selected subtask owner does not exist or is inactive', 'OWNER_NOT_FOUND')
+    }
+
+    // Verify Owner belongs to parent's Team
+    const belongsToTeam =
+      ownerDoc.teams &&
+      ownerDoc.teams.some((t: any) => t.toString() === parent.team.toString())
+
+    if (!belongsToTeam && user.role !== 'Super Admin') {
+      throw AppError.badRequest(
+        `Selected subtask owner '${ownerDoc.name}' does not belong to the task's assigned team`,
+        'INVALID_TEAM_ASSIGNMENT',
+      )
+    }
+
+    // Verify Owner belongs to same Branch as task
+    const ownerBranchId = ownerDoc.branch
+      ? (ownerDoc.branch._id ? ownerDoc.branch._id.toString() : ownerDoc.branch.toString())
+      : ''
+    const parentBranchId = parent.branch
+      ? (parent.branch._id ? parent.branch._id.toString() : parent.branch.toString())
+      : ''
+    if (ownerBranchId && parentBranchId && ownerBranchId !== parentBranchId) {
+      throw AppError.badRequest(
+        `Subtask owner '${ownerDoc.name}' does not belong to the same branch as the task`,
+        'CROSS_BRANCH_ASSIGNMENT',
+      )
+    }
+
+    // Check duplicate assignee under this parent
+    const existingSubtask = await Task.findOne({
+      parentTask: parent._id,
+      owner: ownerDoc._id,
+      deletedAt: null,
+    }).exec()
+
+    if (existingSubtask) {
+      throw AppError.badRequest(
+        `An active subtask is already assigned to '${ownerDoc.name}' under this parent task`,
+        'DUPLICATE_SUBTASK_ASSIGNEE',
+      )
+    }
+
+    // Promote parent if it was standalone
+    if (parent.taskLevel === 'standalone') {
+      parent.taskLevel = 'parent'
+      await parent.save()
+    }
+
+    // Create subtask
+    const newSubtask = await Task.create({
+      title: input.title,
+      note: input.note || '',
+      team: parent.team,
+      branch: parent.branch,
+      owner: ownerDoc._id,
+      reportingManager: parent.reportingManager,
+      createdBy: user.id,
+      due: input.due || parent.due,
+      priority: input.priority || parent.priority || 'normal',
+      status: 'todo',
+      taskLevel: 'subtask',
+      parentTask: parent._id,
+      responsibilityLabel: input.responsibilityLabel || null,
+      isRequired: input.isRequired !== false,
+    })
+
+    // Record Activity
+    await Activity.create({
+      task: newSubtask._id,
+      user: user.id,
+      action: 'created',
+      at: new Date(),
+    })
+
+    await Activity.create({
+      task: parent._id,
+      user: user.id,
+      action: 'edited',
+      at: new Date(),
+    })
+
+    // Resync parent status
+    await syncParentStatusFromSubtasks(parent._id)
+
+    // Notify assignee and reporting manager
+    try {
+      await notificationService.handleSubtaskAdded(parent, newSubtask, user)
+    } catch (notifErr: any) {
+      console.warn('[TASK_SERVICE] Subtask notification warning:', notifErr.message)
+    }
+
+    // Return populated subtask
+    const populated = await Task.findById(newSubtask._id)
+      .populate('team')
+      .populate('branch')
+      .populate('owner')
+      .populate('reportingManager')
+      .populate('createdBy')
+      .populate({ path: 'parentTask', select: 'title due priority status' })
       .exec()
 
     return formatTask(populated!)
@@ -413,6 +1008,20 @@ export const taskService = {
       }
     }
 
+    // Parent Task filter
+    if (query.parentTask !== undefined) {
+      if (query.parentTask === 'null' || query.parentTask === 'none') {
+        filter.parentTask = null
+      } else if (mongoose.Types.ObjectId.isValid(query.parentTask)) {
+        filter.parentTask = new mongoose.Types.ObjectId(query.parentTask)
+      }
+    }
+
+    // Task Level filter
+    if (query.taskLevel && query.taskLevel !== 'all') {
+      filter.taskLevel = query.taskLevel
+    }
+
     // Due filter (using Asia/Kolkata date)
     const todayIST = getTodayDateIST()
     if (query.due === 'today') {
@@ -446,12 +1055,35 @@ export const taskService = {
         .populate('owner')
         .populate('reportingManager')
         .populate('createdBy')
+        .populate({ path: 'parentTask', select: 'title due priority status' })
         .exec(),
       Task.countDocuments(filter).exec(),
     ])
 
+    // Batch load subtasks for any parent tasks in this page
+    const parentIds = tasks.filter((t) => t.taskLevel === 'parent').map((t) => t._id)
+    const subtasksByParent: Record<string, ITask[]> = {}
+    if (parentIds.length > 0) {
+      const allChildSubtasks = await Task.find({
+        parentTask: { $in: parentIds },
+        deletedAt: null,
+      })
+        .populate('owner')
+        .exec()
+
+      for (const st of allChildSubtasks) {
+        const pId = (
+          st.parentTask && typeof st.parentTask === 'object' && '_id' in st.parentTask
+            ? (st.parentTask as any)._id
+            : st.parentTask
+        ).toString()
+        if (!subtasksByParent[pId]) subtasksByParent[pId] = []
+        subtasksByParent[pId].push(st)
+      }
+    }
+
     return {
-      tasks: tasks.map((t) => formatTask(t)),
+      tasks: tasks.map((t) => formatTask(t, undefined, subtasksByParent[t._id.toString()])),
       total,
       page,
       limit,
@@ -476,10 +1108,23 @@ export const taskService = {
       .populate('owner')
       .populate('reportingManager')
       .populate('createdBy')
+      .populate({ path: 'parentTask', select: 'title due priority status' })
       .exec()
 
     if (!task) {
       throw AppError.notFound('Task not found or has been deleted', 'TASK_NOT_FOUND')
+    }
+
+    let subtasks: ITask[] = []
+    let subtaskOwnerIds: string[] = []
+    if (task.taskLevel === 'parent') {
+      subtasks = await Task.find({ parentTask: task._id, deletedAt: null })
+        .populate('owner')
+        .exec()
+      subtaskOwnerIds = subtasks.map((s) => {
+        const o = s.owner as any
+        return o && typeof o === 'object' && '_id' in o ? o._id.toString() : String(o)
+      })
     }
 
     const isReportingManager =
@@ -488,14 +1133,18 @@ export const taskService = {
         ? (task.reportingManager as any)._id.toString() === user.id
         : task.reportingManager?.toString() === user.id
 
+    const isSubtaskOwner = subtaskOwnerIds.includes(user.id.toString())
+
     const canView =
       isReportingManager ||
+      isSubtaskOwner ||
       permissionsService.can(user, 'task.view', {
         teamId: task.team,
         branchId: task.branch,
         ownerId: task.owner,
         createdById: task.createdBy,
         reportingManagerId: task.reportingManager,
+        subtaskOwnerIds,
       })
 
     if (!canView) {
@@ -507,7 +1156,7 @@ export const taskService = {
       .populate('user')
       .exec()
 
-    return formatTask(task, activities)
+    return formatTask(task, activities, subtasks)
   },
 
   /**
@@ -560,6 +1209,18 @@ export const taskService = {
       task.priority = input.priority
     }
 
+    if (input.responsibilityLabel !== undefined && input.responsibilityLabel !== task.responsibilityLabel) {
+      changes.responsibilityLabel = { from: task.responsibilityLabel, to: input.responsibilityLabel }
+      task.responsibilityLabel = input.responsibilityLabel
+    }
+
+    let isRequiredChanged = false
+    if (input.isRequired !== undefined && input.isRequired !== task.isRequired) {
+      changes.isRequired = { from: task.isRequired, to: input.isRequired }
+      task.isRequired = input.isRequired
+      isRequiredChanged = true
+    }
+
     if (input.owner !== undefined) {
       let newOwner: (IUser & { _id: mongoose.Types.ObjectId }) | null = null
       if (mongoose.Types.ObjectId.isValid(input.owner)) {
@@ -584,6 +1245,23 @@ export const taskService = {
           `New owner '${newOwner.name}' does not belong to this task's assigned team`,
           'INVALID_TEAM_ASSIGNMENT',
         )
+      }
+
+      // Check duplicate assignee if this is a subtask
+      if (task.parentTask) {
+        const existingSibling = await Task.findOne({
+          parentTask: task.parentTask,
+          owner: newOwner._id,
+          _id: { $ne: task._id },
+          deletedAt: null,
+        }).exec()
+
+        if (existingSibling) {
+          throw AppError.badRequest(
+            `An active subtask is already assigned to '${newOwner.name}' under this parent task`,
+            'DUPLICATE_SUBTASK_ASSIGNEE',
+          )
+        }
       }
 
       // Check self-reporting against current reporting manager
@@ -687,7 +1365,27 @@ export const taskService = {
         } catch (notifErr: any) {
           console.warn('[TASK_SERVICE] Notification queue warning on task reassignment:', notifErr.message)
         }
+
+        if (changes.reportingManager && task.taskLevel === 'parent') {
+          await Task.updateMany(
+            { parentTask: task._id, deletedAt: null },
+            { $set: { reportingManager: task.reportingManager } },
+          )
+        }
       }
+
+      // If isRequired changed on a subtask, recalculate parent status
+      if (isRequiredChanged && task.parentTask) {
+        const pId = getParentTaskId(task.parentTask)
+        if (pId) {
+          await syncParentStatusFromSubtasks(pId)
+        }
+      }
+    }
+
+    let subtasks: ITask[] = []
+    if (task.taskLevel === 'parent') {
+      subtasks = await Task.find({ parentTask: task._id, deletedAt: null }).populate('owner').exec()
     }
 
     const populated = await Task.findById(task._id)
@@ -696,6 +1394,7 @@ export const taskService = {
       .populate('owner')
       .populate('reportingManager')
       .populate('createdBy')
+      .populate({ path: 'parentTask', select: 'title due priority status' })
       .exec()
 
     const activities = await Activity.find({ task: task._id })
@@ -703,11 +1402,12 @@ export const taskService = {
       .populate('user')
       .exec()
 
-    return formatTask(populated!, activities)
+    return formatTask(populated!, activities, subtasks)
   },
 
   /**
    * Updates task status (todo, doing, done) directly without approval.
+   * Derived parent task status cannot be set manually.
    */
   async updateTaskStatus(
     id: string,
@@ -721,6 +1421,14 @@ export const taskService = {
     const task = await Task.findOne({ _id: id, deletedAt: null }).exec()
     if (!task) {
       throw AppError.notFound('Task not found', 'TASK_NOT_FOUND')
+    }
+
+    // Guard: Parent status is derived automatically from its subtasks
+    if (task.taskLevel === 'parent') {
+      throw AppError.badRequest(
+        'Parent task status is automatically derived from its subtasks and cannot be updated manually',
+        'PARENT_STATUS_DERIVED',
+      )
     }
 
     // Scope check: Super Admin = all, Branch Admin = branch, Team Lead = team, Member = own
@@ -746,6 +1454,7 @@ export const taskService = {
         .populate('owner')
         .populate('reportingManager')
         .populate('createdBy')
+        .populate({ path: 'parentTask', select: 'title due priority status' })
         .exec()
       return formatTask(populated!)
     }
@@ -770,12 +1479,29 @@ export const taskService = {
       at: new Date(),
     })
 
+    if (status === 'done' && oldStatus !== 'done') {
+      try {
+        await notificationService.handleTaskCompleted(task, { id: user.id, name: user.name })
+      } catch (notifErr: any) {
+        console.warn('[TASK_SERVICE] Notification warning on task completion:', notifErr.message)
+      }
+    }
+
+    // Resync parent status and progress if this task is a subtask
+    if (task.parentTask) {
+      const pId = getParentTaskId(task.parentTask)
+      if (pId) {
+        await syncParentStatusFromSubtasks(pId)
+      }
+    }
+
     const populated = await Task.findById(task._id)
       .populate('team')
       .populate('branch')
       .populate('owner')
       .populate('reportingManager')
       .populate('createdBy')
+      .populate({ path: 'parentTask', select: 'title due priority status' })
       .exec()
 
     const activities = await Activity.find({ task: task._id })
@@ -788,6 +1514,7 @@ export const taskService = {
 
   /**
    * Soft deletes a task by setting deletedAt timestamp.
+   * Soft-deleting a parent cascades to its subtasks.
    */
   async deleteTask(
     id: string,
@@ -813,15 +1540,32 @@ export const taskService = {
       throw AppError.forbidden('You do not have permission to delete this task', 'FORBIDDEN')
     }
 
-    task.deletedAt = new Date()
+    const now = new Date()
+    task.deletedAt = now
     await task.save()
 
     await Activity.create({
       task: task._id,
       user: user.id,
       action: 'deleted',
-      at: new Date(),
+      at: now,
     })
+
+    // Cascade soft delete to subtasks if this is a parent task
+    if (task.taskLevel === 'parent') {
+      await Task.updateMany(
+        { parentTask: task._id, deletedAt: null },
+        { $set: { deletedAt: now } },
+      )
+    }
+
+    // If deleting a subtask, resync parent status
+    if (task.parentTask) {
+      const pId = getParentTaskId(task.parentTask)
+      if (pId) {
+        await syncParentStatusFromSubtasks(pId)
+      }
+    }
 
     return {
       success: true,

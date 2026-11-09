@@ -55,7 +55,11 @@ export function NotificationBell() {
     setIsOpen(false)
 
     if (notif.taskId) {
-      navigate(`/tasks/${notif.taskId}`)
+      if (notif.type === 'task_discussion_message') {
+        navigate(`/tasks/${notif.taskId}?tab=discussion`)
+      } else {
+        navigate(`/tasks/${notif.taskId}`)
+      }
     }
   }
 

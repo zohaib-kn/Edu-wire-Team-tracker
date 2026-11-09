@@ -1,8 +1,17 @@
 import { useNavigate } from 'react-router-dom'
-import { Calendar, User, MoreVertical, Edit2, Trash2, ArrowUpRight, CheckCircle2 } from 'lucide-react'
-import { useState, useRef, useEffect } from 'react'
+import {
+  Calendar,
+  User,
+  MoreVertical,
+  Edit2,
+  Trash2,
+  ArrowUpRight,
+  CheckCircle2,
+} from 'lucide-react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { TaskStatusSelect } from './TaskStatusSelect'
 import { TaskPriorityBadge } from './TaskPriorityBadge'
+import { Folder, type FolderEntry } from '@/components/ui/Folder'
 import { formatDateOnly, isTaskOverdue, isTaskDueToday } from '../utils/dateUtils'
 import { canPerformTaskAction } from '../utils/taskPermissions'
 import { useAuth } from '@/features/auth/hooks/useAuth'
@@ -27,6 +36,102 @@ export function TaskCard({ task, onEdit, onDelete }: TaskCardProps) {
   const overdue = isTaskOverdue(task.due, task.status)
   const dueToday = isTaskDueToday(task.due, task.status)
 
+  const hasSubtasks =
+    task.taskLevel === 'parent' && Boolean(task.subtasks && task.subtasks.length > 0)
+  const subtasks = task.subtasks || []
+
+  const parentTitle =
+    task.parentTask && typeof task.parentTask === 'object' && 'title' in task.parentTask
+      ? (task.parentTask as any).title
+      : null
+
+  // Memoize Folder entries for multi-assignee Parent Task
+  const folderItems = useMemo<FolderEntry[]>(() => {
+    if (!subtasks || subtasks.length === 0) return []
+
+    return subtasks.map((sub) => {
+      const isDone = sub.status === 'done'
+      const isDoing = sub.status === 'doing'
+
+      return {
+        id: sub.id,
+        title: sub.title,
+        description: `${sub.owner}${sub.responsibilityLabel ? ` • ${sub.responsibilityLabel}` : ''}`,
+        content: (
+          <div className="box-border flex h-full flex-col justify-between p-3 select-none text-left bg-white rounded-inner shadow-xs">
+            <div>
+              {/* Top row: Status pill + Due date */}
+              <div className="flex items-center justify-between gap-1 mb-1.5">
+                <span
+                  className={cn(
+                    'text-[9px] font-bold px-1.5 py-0.5 rounded-full border',
+                    isDone
+                      ? 'bg-tint-green-bg text-tint-green-text border-tint-green-border'
+                      : isDoing
+                      ? 'bg-tint-amber-bg text-tint-amber-text border-tint-amber-border'
+                      : 'bg-tint-blue-bg text-tint-blue-text border-tint-blue-border',
+                  )}
+                >
+                  {isDone ? '✓ Done' : isDoing ? '⏳ Doing' : '○ To Do'}
+                </span>
+                {sub.due && (
+                  <span className="text-[8px] text-text-muted font-medium">
+                    {formatDateOnly(sub.due)}
+                  </span>
+                )}
+              </div>
+
+              {/* Subtask Title */}
+              <h5
+                className={cn(
+                  'text-xs font-bold leading-tight line-clamp-2 text-text-primary mb-1',
+                  isDone && 'line-through text-text-muted',
+                )}
+                title={sub.title}
+              >
+                {sub.title}
+              </h5>
+
+              {/* Assignee & Responsibility */}
+              <div className="space-y-0.5 mb-2">
+                <div className="flex items-center gap-1 text-[10px] text-text-muted font-medium">
+                  <User className="w-2.5 h-2.5 shrink-0 text-brand-blue" />
+                  <span className="truncate max-w-[85px]">{sub.owner}</span>
+                </div>
+                {sub.responsibilityLabel && (
+                  <span className="inline-block text-[8px] font-semibold px-1 py-0.5 bg-slate-100 text-slate-700 rounded border border-slate-200">
+                    {sub.responsibilityLabel}
+                  </span>
+                )}
+              </div>
+
+              {/* Document skeleton lines (matching ReactBits look) */}
+              <div className="space-y-1 opacity-40 mb-2">
+                <div className="h-1 bg-slate-400 rounded-full w-full" />
+                <div className="h-1 bg-slate-400 rounded-full w-4/5" />
+                <div className="h-1 bg-slate-400 rounded-full w-3/5" />
+              </div>
+            </div>
+
+            {/* Action button */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                navigate(`/tasks/${encodeURIComponent(sub.id)}`)
+              }}
+              className="w-full py-1 px-1.5 rounded bg-brand-blue hover:bg-brand-blue-hover text-white text-[9px] font-semibold flex items-center justify-center gap-1 transition-all shadow-xs cursor-pointer active:scale-95"
+              title="View Task Details"
+            >
+              <span>View Task Details</span>
+              <ArrowUpRight className="w-2.5 h-2.5" />
+            </button>
+          </div>
+        ),
+      }
+    })
+  }, [subtasks, navigate])
+
   // Close card actions dropdown when clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -40,6 +145,42 @@ export function TaskCard({ task, onEdit, onDelete }: TaskCardProps) {
 
   const handleCardClick = () => {
     navigate(`/tasks/${encodeURIComponent(task.id)}`)
+  }
+
+  // Pure 3D Animated Folder for Multi-Assignee Parent Tasks (No outer card container)
+  if (hasSubtasks) {
+    return (
+      <div
+        className="relative flex items-center justify-center py-6 px-1 my-2 overflow-visible select-none cursor-pointer"
+        onClick={(e) => e.stopPropagation()}
+        onDoubleClick={() => navigate(`/tasks/${encodeURIComponent(task.id)}`)}
+        title="Click folder to open subtasks (Double-click to open parent details)"
+      >
+        <Folder
+          label={task.title}
+          mode="flap"
+          variant="solid"
+          layout="spread"
+          color={
+            task.status === 'done'
+              ? '#10B981'
+              : task.status === 'doing'
+              ? '#3B82F6'
+              : '#2563EB'
+          }
+          paperColor="#FFFFFF"
+          tabPosition="right"
+          openOn="click"
+          size={1.05}
+          bounce={0.4}
+          peek={true}
+          zoomOnClick={true}
+          draggable={false}
+          theme="light"
+          items={folderItems}
+        />
+      </div>
+    )
   }
 
   return (
@@ -58,9 +199,16 @@ export function TaskCard({ task, onEdit, onDelete }: TaskCardProps) {
       <div>
         {/* Top header row: Title on left, Priority badge + optional more menu on right */}
         <div className="flex items-start justify-between gap-2 mb-2">
-          <h4 className="text-sm font-semibold text-text-primary leading-snug line-clamp-2 group-hover:text-brand-blue transition-colors">
-            {task.title}
-          </h4>
+          <div className="min-w-0 flex-1">
+            {parentTitle && (
+              <span className="text-[11px] font-medium text-brand-blue block truncate mb-0.5">
+                {parentTitle} /
+              </span>
+            )}
+            <h4 className="text-sm font-semibold text-text-primary leading-snug line-clamp-2 group-hover:text-brand-blue transition-colors">
+              {task.title}
+            </h4>
+          </div>
 
           <div className="flex items-center gap-1 shrink-0 pt-0.5">
             <TaskPriorityBadge priority={task.priority} />
@@ -135,24 +283,37 @@ export function TaskCard({ task, onEdit, onDelete }: TaskCardProps) {
           </p>
         )}
 
-        {/* Tags row: Team & Reporting Manager */}
-        {(task.team || task.reportingManager) && (
-          <div className="flex items-center gap-1.5 flex-wrap mb-3 text-[10px]">
-            {task.team && (
-              <span className="inline-flex items-center text-text-muted bg-slate-100 rounded-badge px-1.5 py-0.5 font-medium">
-                {task.team}
-              </span>
-            )}
-            {task.reportingManager && (
-              <span
-                className="inline-flex items-center font-medium text-tint-amber-text bg-tint-amber-bg rounded-badge px-1.5 py-0.5 border border-tint-amber-border"
-                title={`Reporting Manager: ${task.reportingManager}`}
-              >
-                RM: {task.reportingManager}
-              </span>
-            )}
-          </div>
-        )}
+        {/* Tags row: Team, Reporting Manager, Parent/Subtask tags, Responsibility */}
+        <div className="flex items-center gap-1.5 flex-wrap mb-3 text-[10px]">
+          {task.taskLevel === 'parent' && (
+            <span className="inline-flex items-center font-semibold text-brand-blue bg-tint-blue-bg rounded-badge px-1.5 py-0.5 border border-tint-blue-border">
+              Parent Task
+            </span>
+          )}
+          {task.progress && (
+            <span className="inline-flex items-center font-medium text-text-muted bg-slate-100 rounded-badge px-1.5 py-0.5">
+              {task.progress.completedRequiredSubtasks}/{task.progress.requiredSubtasks} Done ({task.progress.progressPercentage}%)
+            </span>
+          )}
+          {task.responsibilityLabel && (
+            <span className="inline-flex items-center font-medium text-slate-700 bg-slate-100 rounded-badge px-1.5 py-0.5 border border-slate-200">
+              {task.responsibilityLabel}
+            </span>
+          )}
+          {task.team && (
+            <span className="inline-flex items-center text-text-muted bg-slate-100 rounded-badge px-1.5 py-0.5 font-medium">
+              {task.team}
+            </span>
+          )}
+          {task.reportingManager && (
+            <span
+              className="inline-flex items-center font-medium text-tint-amber-text bg-tint-amber-bg rounded-badge px-1.5 py-0.5 border border-tint-amber-border"
+              title={`Reporting Manager: ${task.reportingManager}`}
+            >
+              RM: {task.reportingManager}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Card Footer: Due Date & Assignee / Status Selector */}

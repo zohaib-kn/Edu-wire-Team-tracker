@@ -5,6 +5,7 @@ import type { IUser } from './User.js'
 
 export type TaskStatus = 'todo' | 'doing' | 'done'
 export type TaskPriority = 'normal' | 'high'
+export type TaskLevel = 'standalone' | 'parent' | 'subtask'
 
 export interface ITask extends Document {
   title: string
@@ -17,6 +18,10 @@ export interface ITask extends Document {
   due: string // YYYY-MM-DD
   priority: TaskPriority
   status: TaskStatus
+  parentTask?: Types.ObjectId | ITask | null
+  taskLevel: TaskLevel
+  responsibilityLabel?: string | null
+  isRequired: boolean
   doneAt?: Date | null
   deletedAt?: Date | null
   createdAt: Date
@@ -79,6 +84,27 @@ const taskSchema = new Schema<ITask>(
       enum: ['todo', 'doing', 'done'],
       default: 'todo',
     },
+    parentTask: {
+      type: Schema.Types.ObjectId,
+      ref: 'Task',
+      default: null,
+      index: true,
+    },
+    taskLevel: {
+      type: String,
+      enum: ['standalone', 'parent', 'subtask'],
+      default: 'standalone',
+      index: true,
+    },
+    responsibilityLabel: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    isRequired: {
+      type: Boolean,
+      default: true,
+    },
     doneAt: {
       type: Date,
       default: null,
@@ -107,6 +133,8 @@ taskSchema.index({ branch: 1, status: 1, due: 1 })
 taskSchema.index({ team: 1, status: 1, due: 1 })
 taskSchema.index({ owner: 1, status: 1 })
 taskSchema.index({ reportingManager: 1, status: 1 })
+taskSchema.index({ parentTask: 1, deletedAt: 1, status: 1 })
+taskSchema.index({ taskLevel: 1, deletedAt: 1 })
 
 export const Task: Model<ITask> =
   mongoose.models.Task || mongoose.model<ITask>('Task', taskSchema)

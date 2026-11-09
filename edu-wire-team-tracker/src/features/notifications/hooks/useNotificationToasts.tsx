@@ -90,9 +90,19 @@ function displayAssignmentToast(
   markAsRead: (id: string) => void,
 ) {
   const isOwner = notif.type === 'task_assigned'
+  const isDiscussion = notif.type === 'task_discussion_message'
+  const isCompleted = notif.type === 'task_completed'
 
-  const title = notif.title || (isOwner ? 'New Task Assigned' : 'New Task Under Your Supervision')
-  const body = notif.body || 'A new task requires your attention.'
+  const title =
+    notif.title ||
+    (isCompleted
+      ? 'Task Completed 🎉'
+      : isDiscussion
+        ? 'New Task Update'
+        : isOwner
+          ? 'New Task Assigned'
+          : 'New Task Under Your Supervision')
+  const body = notif.body || 'A new update requires your attention.'
 
   toast.custom(
     (t) => (
@@ -104,7 +114,7 @@ function displayAssignmentToast(
           markAsRead(notif.id)
           toast.dismiss(t.id)
           if (notif.taskId) {
-            navigate(`/tasks/${notif.taskId}`)
+            navigate(isDiscussion ? `/tasks/${notif.taskId}?tab=discussion` : `/tasks/${notif.taskId}`)
           }
         }}
       >
@@ -114,12 +124,16 @@ function displayAssignmentToast(
             <div className="shrink-0 pt-0.5">
               <span
                 className={`inline-flex items-center justify-center w-9 h-9 rounded-nav text-lg border ${
-                  isOwner
-                    ? 'bg-tint-blue-bg text-tint-blue-text border-tint-blue-border'
-                    : 'bg-tint-amber-bg text-tint-amber-text border-tint-amber-border'
+                  isCompleted
+                    ? 'bg-tint-green-bg text-tint-green-text border-tint-green-border'
+                    : isDiscussion
+                      ? 'bg-tint-blue-bg text-brand-blue border-tint-blue-border'
+                      : isOwner
+                        ? 'bg-tint-blue-bg text-tint-blue-text border-tint-blue-border'
+                        : 'bg-tint-amber-bg text-tint-amber-text border-tint-amber-border'
                 }`}
               >
-                {isOwner ? '📋' : '👀'}
+                {isCompleted ? '🎉' : isDiscussion ? '💬' : isOwner ? '📋' : '👀'}
               </span>
             </div>
 
@@ -129,7 +143,11 @@ function displayAssignmentToast(
               <p className="mt-1 text-xs text-text-muted leading-snug line-clamp-2">{body}</p>
               {notif.taskId && (
                 <p className="mt-1.5 text-[11px] font-semibold text-brand-blue flex items-center gap-1">
-                  Click to view task &rarr;
+                  {isDiscussion
+                    ? 'Click to view discussion \u2192'
+                    : isCompleted
+                      ? 'Click to view completed task \u2192'
+                      : 'Click to view task \u2192'}
                 </p>
               )}
             </div>

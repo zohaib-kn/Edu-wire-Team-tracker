@@ -1,5 +1,6 @@
 import { apiClient } from '@/lib/api/apiClient'
 import type {
+  CreateSubtaskPayload,
   CreateTaskPayload,
   Task,
   TaskFilterParams,
@@ -92,6 +93,18 @@ export const taskService = {
   async createTask(payload: CreateTaskPayload): Promise<Task> {
     const response = await apiClient.post<Task | { data: Task } | { task: Task }>(
       '/tasks',
+      payload,
+    )
+    const raw = response.data as Record<string, unknown>
+    return (raw?.data || raw?.task || raw) as Task
+  },
+
+  /**
+   * Adds a subtask to an existing task via POST /api/v1/tasks/:id/subtasks
+   */
+  async createSubtask(taskId: string, payload: CreateSubtaskPayload): Promise<Task> {
+    const response = await apiClient.post<Task | { data: Task } | { task: Task }>(
+      `/tasks/${encodeURIComponent(taskId)}/subtasks`,
       payload,
     )
     const raw = response.data as Record<string, unknown>

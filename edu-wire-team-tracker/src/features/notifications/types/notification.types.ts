@@ -5,6 +5,8 @@ export type NotificationType =
   | 'task_supervised'
   | 'task_reassigned'
   | 'task_reminder'
+  | 'task_discussion_message'
+  | 'task_completed'
   | string
 
 export interface AppNotification {

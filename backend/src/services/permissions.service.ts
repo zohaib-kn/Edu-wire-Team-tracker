@@ -8,6 +8,7 @@ export interface TaskResourceContext {
   ownerId?: string | Types.ObjectId | unknown
   createdById?: string | Types.ObjectId | unknown
   reportingManagerId?: string | Types.ObjectId | unknown
+  subtaskOwnerIds?: (string | Types.ObjectId | unknown)[]
 }
 
 function extractId(val: unknown): string | null {
@@ -47,6 +48,14 @@ export const permissionsService = {
     if (permissionKey === 'task.view' && resource.reportingManagerId) {
       const reportingManagerId = extractId(resource.reportingManagerId)
       if (reportingManagerId && reportingManagerId === user.id.toString()) {
+        return true
+      }
+    }
+
+    // Delegated narrow read access: An assigned subtask owner can view the parent task
+    if (permissionKey === 'task.view' && resource.subtaskOwnerIds && Array.isArray(resource.subtaskOwnerIds)) {
+      const isSubOwner = resource.subtaskOwnerIds.some((sId) => extractId(sId) === user.id.toString())
+      if (isSubOwner) {
         return true
       }
     }
@@ -128,5 +137,88 @@ export const permissionsService = {
       default:
         return { _id: { $exists: false } }
     }
+  },
+
+  /**
+   * Checks whether the user is an authorized participant in a task discussion.
+   * Authorized participants:
+   * 1. Super Admin: universal authorized scope.
+   * 2. Branch Admin: tasks within their authorized branch.
+   * 3. Team Lead: tasks within their authorized team scope.
+   * 4. Task Owner: assigned owner of this specific task.
+   * 5. Reporting Manager: explicitly designated reporting manager for this task.
+   *
+   * Note: Creators do not automatically receive lifetime discussion access unless
+   * they fulfill one of the explicit participant roles above.
+   * Does not expand task.edit or task.delete privileges.
+   */
+  canAccessTaskDiscussion(
+    user: AuthenticatedUserContext,
+    resource:
+      | TaskResourceContext
+      | {
+          team?: unknown
+          branch?: unknown
+          owner?: unknown
+          reportingManager?: unknown
+          createdBy?: unknown
+          teamId?: unknown
+          branchId?: unknown
+          ownerId?: unknown
+          reportingManagerId?: unknown
+        },
+  ): boolean {
+    if (!user) return false
+
+    // 1. Super Admin has universal authorized access
+    if (user.role === 'Super Admin') {
+      return true
+    }
+
+    const userId = user.id.toString()
+    const res = resource as Record<string, unknown>
+    const ownerId = extractId(res.owner ?? res.ownerId)
+    const reportingManagerId = extractId(res.reportingManager ?? res.reportingManagerId)
+    const branchId = extractId(res.branch ?? res.branchId)
+    const teamId = extractId(res.team ?? res.teamId)
+
+    // 2. Task Owner
+    if (ownerId && ownerId === userId) {
+      return true
+    }
+
+    // 3. Reporting Manager (delegated supervisory access explicitly for this task)
+    if (reportingManagerId && reportingManagerId === userId) {
+      return true
+    }
+
+    // 4. Subtask Owner participating in Parent Task discussion
+    if (res.subtaskOwnerIds && Array.isArray(res.subtaskOwnerIds)) {
+      const isSubOwner = res.subtaskOwnerIds.some((sId) => extractId(sId) === userId)
+      if (isSubOwner) {
+        return true
+      }
+    }
+
+    // 4. Branch Admin: tasks within authorized branch
+    if (user.role === 'Branch Admin') {
+      const userBranchId = user.branchId ? user.branchId.toString() : null
+      if (userBranchId && branchId && userBranchId === branchId) {
+        return true
+      }
+    }
+
+    // 5. Team Lead: tasks within authorized team scope
+    if (user.role === 'Team Lead') {
+      const userTeams = user.teams || []
+      if (teamId && userTeams.some((t) => t.toString() === teamId)) {
+        const userBranchId = user.branchId ? user.branchId.toString() : null
+        if (!userBranchId || !branchId || userBranchId === branchId) {
+          return true
+        }
+      }
+    }
+
+    return false
   },
 }

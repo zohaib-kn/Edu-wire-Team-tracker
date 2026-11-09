@@ -191,6 +191,54 @@ async function _initWorkerProcessors(): Promise<Worker[]> {
     processor: async (job) => {
       console.log(`[PROCESSOR: Push] Processing push notification job: ${job.id}`, job.data)
 
+      if (job.data?.type === 'task_discussion_message' || job.data?.type === 'task_completed') {
+        const notifType = job.data.type
+        const { userId, taskId, messageId, to, recipient, title, body, deepLink } = job.data || {}
+        const tokens = Array.isArray(to) ? to : to ? [to] : []
+        const itemKey = messageId || taskId
+        const idempotencyKey = job.opts.jobId || `push:${itemKey}:${userId}`
+
+        if (tokens.length === 0) {
+          await Notification.create({
+            user: userId,
+            type: notifType,
+            task: taskId,
+            channel: 'push',
+            status: 'skipped',
+            recipient: recipient || 'unknown',
+            error: 'NO_PUSH_TOKENS',
+            jobId: job.id,
+            idempotencyKey: `push_skip:${itemKey}:${userId}`,
+            providerPayload: job.data,
+          })
+          return { success: true, status: 'skipped', reason: 'NO_PUSH_TOKENS' }
+        }
+
+        const pushResult = await expoService.sendPushNotification({
+          to: tokens,
+          userId,
+          title,
+          body,
+          data: { taskId, messageId, deepLink, type: notifType },
+        })
+
+        await Notification.create({
+          user: userId,
+          type: notifType,
+          task: taskId,
+          channel: 'push',
+          status: pushResult.status,
+          recipient: tokens[0] || recipient,
+          sentAt: pushResult.accepted ? new Date() : null,
+          error: pushResult.error || pushResult.skipReason || null,
+          jobId: job.id,
+          idempotencyKey,
+          providerPayload: job.data,
+        })
+
+        return { success: pushResult.accepted, status: pushResult.status }
+      }
+
       if (job.data?.to && job.data?.userId && job.data?.title) {
         const result = await expoService.sendPushNotification(job.data)
         return { success: result.accepted, ...result }

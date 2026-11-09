@@ -35,6 +35,7 @@ export const summaryService = {
 
     const baseFilter: Record<string, any> = {
       deletedAt: null,
+      taskLevel: { $ne: 'parent' },
       ...scopeFilter,
     }
 
