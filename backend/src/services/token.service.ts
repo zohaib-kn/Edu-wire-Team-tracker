@@ -44,15 +44,24 @@ export const tokenService = {
   },
 
   /**
-   * Safe cookie options for web refresh tokens.
+   * Base cookie attributes shared by set-cookie and clearCookie calls.
    */
-  getRefreshCookieOptions(): CookieOptions {
+  getClearRefreshCookieOptions(): CookieOptions {
     const isProduction = env.NODE_ENV === 'production'
     return {
       httpOnly: true,
       secure: isProduction,
       sameSite: 'lax',
       path: '/api/v1/auth',
+    }
+  },
+
+  /**
+   * Safe cookie options for web refresh tokens.
+   */
+  getRefreshCookieOptions(): CookieOptions {
+    return {
+      ...this.getClearRefreshCookieOptions(),
       maxAge: REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000,
     }
   },

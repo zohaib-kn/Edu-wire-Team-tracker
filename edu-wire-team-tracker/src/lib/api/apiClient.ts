@@ -24,10 +24,13 @@ export function onSessionExpired(handler: SessionExpiredHandler): void {
   sessionExpiredHandler = handler
 }
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_URL ||
-  import.meta.env.VITE_API_BASE_URL ||
-  '/api/v1'
+// Always use relative /api/v1 in production so requests route through the same-origin
+// proxy (Vercel rewrites / Nginx) and preserve httpOnly SameSite=Lax cookies.
+const API_BASE_URL = import.meta.env.PROD
+  ? '/api/v1'
+  : import.meta.env.VITE_API_URL ||
+    import.meta.env.VITE_API_BASE_URL ||
+    '/api/v1'
 
 export const apiClient: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,

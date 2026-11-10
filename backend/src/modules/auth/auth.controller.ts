@@ -56,7 +56,10 @@ export const authController = {
       })
     } catch (error) {
       // Clear cookie on refresh error to prevent repeated failed attempts
-      res.clearCookie(REFRESH_COOKIE_NAME, { path: '/api/v1/auth' })
+      res.clearCookie(
+        REFRESH_COOKIE_NAME,
+        tokenService.getClearRefreshCookieOptions(),
+      )
       next(error)
     }
   },
@@ -93,7 +96,10 @@ export const authController = {
       }
 
       // Clear refresh cookie
-      res.clearCookie(REFRESH_COOKIE_NAME, { path: '/api/v1/auth' })
+      res.clearCookie(
+        REFRESH_COOKIE_NAME,
+        tokenService.getClearRefreshCookieOptions(),
+      )
 
       res.status(200).json({
         success: true,

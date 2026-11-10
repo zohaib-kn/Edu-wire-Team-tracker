@@ -13,6 +13,17 @@ const envSchema = z.object({
     .default('development'),
   PORT: z.coerce.number().default(5000),
   FRONTEND_URL: z.string().default('http://localhost:5173'),
+  TRUST_PROXY: z
+    .string()
+    .optional()
+    .transform((val) => {
+      if (val === undefined || val.trim() === '') return undefined
+      const normalized = val.trim().toLowerCase()
+      if (normalized === 'true') return true
+      if (normalized === 'false') return false
+      if (/^\d+$/.test(normalized)) return Number(normalized)
+      return val.trim()
+    }),
   MONGODB_URI: z
     .string()
     .min(1, 'MONGODB_URI is required. Configure your MongoDB connection string in backend/.env'),

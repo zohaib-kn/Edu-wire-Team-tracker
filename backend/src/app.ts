@@ -10,13 +10,33 @@ import { errorHandler } from './middleware/errorHandler.js'
 
 export const app: Application = express()
 
+// Trust immediate reverse proxy hop in production (Render / Nginx / Vercel)
+// so req.ip, req.protocol, and login rate limiting behave accurately
+app.set(
+  'trust proxy',
+  env.TRUST_PROXY ?? (env.NODE_ENV === 'production' ? 1 : false),
+)
+
 // Security headers
 app.use(helmet())
 
-// Restricted CORS for configured frontend origin with credentials enabled
+// Parse comma-separated FRONTEND_URL origins and normalize trailing slashes
+const allowedOrigins = env.FRONTEND_URL.split(',')
+  .map((origin) => origin.trim().replace(/\/+$/, ''))
+  .filter(Boolean)
+
+// Restricted CORS for configured frontend origin(s) with credentials enabled
 app.use(
   cors({
-    origin: env.FRONTEND_URL,
+    origin: (requestOrigin, callback) => {
+      // Allow same-server / non-browser requests without an Origin header
+      if (!requestOrigin) {
+        callback(null, true)
+        return
+      }
+      const normalizedOrigin = requestOrigin.replace(/\/+$/, '')
+      callback(null, allowedOrigins.includes(normalizedOrigin))
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
