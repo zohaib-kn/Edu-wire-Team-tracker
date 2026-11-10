@@ -167,7 +167,7 @@ function UserFormSheetInner({
         description={
           isEditing
             ? 'Update staff profile and branch/team assignments.'
-            : 'Create an internal employee profile. A temporary password must be provided.'
+            : 'Create an internal employee profile and set their account password.'
         }
         footer={
           <>
@@ -352,21 +352,21 @@ function UserFormSheetInner({
             )}
           </div>
 
-          {/* Temporary Password (on Create only) */}
+          {/* Account Password (on Create only) */}
           {!isEditing && (
             <div className="pt-2 border-t border-slate-100">
               <Input
                 {...register('temporaryPassword')}
                 id="temporaryPassword"
                 type="password"
-                label="Initial Temporary Password"
+                label="Account Password"
                 placeholder="Min 8 characters, letters & numbers"
                 required
                 showPasswordToggle
                 leftIcon={<KeyRound className="w-4 h-4 text-slate-400" />}
                 error={errors.temporaryPassword?.message}
                 disabled={isSaving}
-                helperText="The user will be required to change this password upon their first sign-in."
+                helperText="The user can sign in directly with this password without being prompted to reset it."
               />
             </div>
           )}

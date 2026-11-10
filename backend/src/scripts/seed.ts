@@ -146,11 +146,10 @@ export async function runSeed(): Promise<void> {
       passwordHash,
       role: superAdminRole._id,
       branch: branchDocs['Bhopal']?._id || null,
-      mustChangePassword: true, // Forces password update on initial login
+      mustChangePassword: false,
       isActive: true,
     })
-    console.log(`  ✓ Super Admin created (${adminEmail}) with mustChangePassword = true`)
-    console.log('  ⚠️  Note: Super Admin must change password upon first login')
+    console.log(`  ✓ Super Admin created (${adminEmail}) with direct sign-in enabled`)
   } else {
     console.log(`  • Super Admin user already exists: ${adminEmail} (password preserved)`)
   }

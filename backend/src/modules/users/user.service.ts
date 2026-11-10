@@ -277,7 +277,7 @@ export const userService = {
       branch: branchDoc._id,
       teams: teamObjectIds,
       passwordHash,
-      mustChangePassword: true,
+      mustChangePassword: false,
       isActive: true,
     })
 
@@ -532,7 +532,7 @@ export const userService = {
 
     const temporaryPassword = generateTemporaryPassword()
     targetUser.passwordHash = await passwordService.hashPassword(temporaryPassword)
-    targetUser.mustChangePassword = true
+    targetUser.mustChangePassword = false
     targetUser.lockedUntil = null
     targetUser.failedLogins = 0
     await targetUser.save()
@@ -549,7 +549,7 @@ export const userService = {
 
     return {
       success: true,
-      message: 'Password reset successfully. A temporary password has been issued.',
+      message: 'Password reset successfully. A new password has been issued.',
       temporaryPassword,
     }
   },

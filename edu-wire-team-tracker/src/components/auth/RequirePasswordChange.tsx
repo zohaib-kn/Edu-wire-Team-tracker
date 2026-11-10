@@ -9,8 +9,7 @@ export interface RequirePasswordChangeProps {
 
 /**
  * Route guard dedicated to /change-password.
- * Only allows users who are authenticated and have mustChangePassword === true.
- * Users who do not need a password change are redirected to /dashboard.
+ * Allows any authenticated user (whether changing password voluntarily or when mustChangePassword is true).
  * Unauthenticated users are redirected to /login.
  */
 export function RequirePasswordChange({ children }: RequirePasswordChangeProps) {
@@ -22,10 +21,6 @@ export function RequirePasswordChange({ children }: RequirePasswordChangeProps) 
 
   if (!isAuthenticated || !user) {
     return <Navigate to="/login" replace />
-  }
-
-  if (!user.mustChangePassword) {
-    return <Navigate to="/dashboard" replace />
   }
 
   return children ? <>{children}</> : <Outlet />

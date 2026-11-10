@@ -1,9 +1,13 @@
 import { KeyRound, ShieldAlert } from 'lucide-react'
 import { ChangePasswordForm } from '@/features/auth/components/ChangePasswordForm'
+import { useAuth } from '@/features/auth/hooks/useAuth'
 import { Card, CardContent } from '@/components/ui/Card'
 import MagicRings from '@/components/ui/MagicRings'
 
 export function ChangePasswordPage() {
+  const { user } = useAuth()
+  const isForced = Boolean(user?.mustChangePassword)
+
   return (
     <div className="relative min-h-screen w-full flex flex-col justify-center items-center bg-page px-4 py-8 sm:px-6 lg:px-8 overflow-hidden select-none">
       {/* Interactive MagicRings WebGL Background */}
@@ -42,10 +46,12 @@ export function ChangePasswordPage() {
           <KeyRound className="w-6 h-6" />
         </div>
         <h1 className="text-2xl font-bold tracking-tight text-text-primary">
-          Set a New Password
+          {isForced ? 'Set a New Password' : 'Change Password'}
         </h1>
         <p className="text-sm text-text-muted mt-1.5">
-          Your account was provisioned with a temporary password. Please set a secure password before proceeding.
+          {isForced
+            ? 'Please set a new password before proceeding.'
+            : 'Update your account password to keep your credentials secure.'}
         </p>
       </div>
 

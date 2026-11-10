@@ -13,7 +13,8 @@ import { Input } from '@/components/ui/Input'
 import { Alert } from '@/components/ui/Alert'
 
 export function ChangePasswordForm() {
-  const { changePassword, logout } = useAuth()
+  const { user, changePassword, logout } = useAuth()
+  const isForced = Boolean(user?.mustChangePassword)
   const navigate = useNavigate()
   const [formError, setFormError] = useState<string | null>(null)
   const [isSuccess, setIsSuccess] = useState(false)
@@ -78,7 +79,7 @@ export function ChangePasswordForm() {
           {...register('currentPassword')}
           id="currentPassword"
           type="password"
-          label="Current Temporary Password"
+          label={isForced ? 'Current Temporary Password' : 'Current Password'}
           placeholder="Enter current password"
           autoComplete="current-password"
           autoFocus
@@ -179,18 +180,32 @@ export function ChangePasswordForm() {
           isLoading={isSubmitting}
           disabled={isSuccess}
         >
-          {isSubmitting ? 'Updating Password...' : 'Set New Password & Continue'}
+          {isSubmitting
+            ? 'Updating Password...'
+            : isForced
+              ? 'Set New Password & Continue'
+              : 'Update Password'}
         </Button>
       </div>
 
       <div className="pt-2 text-center">
-        <button
-          type="button"
-          onClick={() => logout()}
-          className="text-xs text-slate-500 hover:text-[#DC2626] font-medium transition-colors cursor-pointer"
-        >
-          Sign out and return later
-        </button>
+        {isForced ? (
+          <button
+            type="button"
+            onClick={() => logout()}
+            className="text-xs text-slate-500 hover:text-[#DC2626] font-medium transition-colors cursor-pointer"
+          >
+            Sign out and return later
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => navigate('/dashboard')}
+            className="text-xs text-slate-500 hover:text-slate-900 font-medium transition-colors cursor-pointer"
+          >
+            Back to Dashboard
+          </button>
+        )}
       </div>
     </form>
   )

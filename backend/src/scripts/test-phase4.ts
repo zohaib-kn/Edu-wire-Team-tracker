@@ -209,10 +209,10 @@ async function runTests() {
 
     const createdUserId = createUserJson.user.id
 
-    // Verify User record in DB has mustChangePassword = true and hashed password
+    // Verify User record in DB has mustChangePassword = false and hashed password
     const dbUser = await User.findById(createdUserId).select('+passwordHash')
     assert(Boolean(dbUser), 'User found in database')
-    assert(dbUser!.mustChangePassword === true, 'New user initialized with mustChangePassword = true')
+    assert(dbUser!.mustChangePassword === false, 'New user initialized with mustChangePassword = false')
     assert(dbUser!.passwordHash.startsWith('$2b$'), 'Password saved as bcrypt hash, not plaintext')
 
     // Duplicate email rejected
@@ -276,7 +276,7 @@ async function runTests() {
     assert(Boolean(resetPassJson.temporaryPassword), 'Temporary password issued in reset response')
 
     const dbUserAfterReset = await User.findById(createdUserId)
-    assert(dbUserAfterReset!.mustChangePassword === true, 'mustChangePassword reset to true')
+    assert(dbUserAfterReset!.mustChangePassword === false, 'mustChangePassword remains false after reset')
 
     // Self role modification guardrail
     const selfRoleRes = await fetch(`${baseUrl}/users/${superAdmin!._id}`, {
@@ -423,9 +423,6 @@ async function runTests() {
     assert(leadCreateRes.status === 201, 'Created Team Lead account')
     const teamLeadId = leadCreateJson.user.id
 
-    // Simulate Team Lead completing their initial required password change
-    await User.findByIdAndUpdate(teamLeadId, { mustChangePassword: false })
-
     // Update team lead in Team model
     admissionsTeam!.lead = teamLeadId as any
     await admissionsTeam!.save()
@@ -469,8 +466,6 @@ async function runTests() {
 
     // Scenario C: Employee A logs in and retrieves assigned tasks via GET /tasks?owner=me
     console.log('• Scenario C: Employee A logs in and retrieves My Tasks')
-    // Simulate Employee A completing mandatory first-time password change
-    await User.findByIdAndUpdate(employeeAId, { mustChangePassword: false })
 
     const empAToken = tokenService.generateAccessToken({
       userId: employeeAId,

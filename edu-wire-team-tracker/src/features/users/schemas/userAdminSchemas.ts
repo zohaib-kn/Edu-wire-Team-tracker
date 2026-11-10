@@ -27,7 +27,7 @@ export const createUserSchema = z.object({
     .optional(),
   temporaryPassword: z
     .string()
-    .min(8, 'Temporary password must be at least 8 characters')
+    .min(8, 'Password must be at least 8 characters')
     .regex(/[A-Za-z]/, 'Password must contain at least one letter')
     .regex(/\d/, 'Password must contain at least one number'),
 })

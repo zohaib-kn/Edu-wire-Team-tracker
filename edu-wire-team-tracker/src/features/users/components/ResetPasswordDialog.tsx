@@ -85,12 +85,12 @@ export function ResetPasswordDialog({
         <div className="space-y-4">
           <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg text-green-900 text-xs">
             <Check className="w-4 h-4 text-green-600 shrink-0" />
-            <span>Password reset successfully. Please securely share the temporary password with {user.name}.</span>
+            <span>Password reset successfully. Please securely share the new password with {user.name}.</span>
           </div>
 
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1">
-              New Temporary Password
+              New Password
             </label>
             <div className="flex items-center gap-2">
               <input
@@ -109,7 +109,7 @@ export function ResetPasswordDialog({
               </Button>
             </div>
             <p className="text-[11px] text-slate-500 mt-1.5">
-              The user will be required to change this password on their next sign-in.
+              The user can sign in directly with this password.
             </p>
           </div>
         </div>
@@ -123,7 +123,7 @@ export function ResetPasswordDialog({
               Reset password for {user.name}?
             </p>
             <p className="text-slate-500 text-xs mb-2 leading-relaxed">
-              This will invalidate their existing password. A temporary password will be issued, and the user must set a new secure password upon their next login.
+              This will invalidate their existing password. A new password will be generated so the user can sign in directly with it.
             </p>
             <div className="flex items-center gap-1.5 text-xs text-amber-700 bg-amber-50 p-2 rounded border border-amber-200/70">
               <AlertCircle className="w-3.5 h-3.5 shrink-0" />

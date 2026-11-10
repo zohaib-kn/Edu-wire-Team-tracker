@@ -48,12 +48,16 @@ export const authService = {
   ): Promise<{ success: boolean; user?: User; message?: string }> {
     const response = await apiClient.post<{
       success?: boolean
+      accessToken?: string
       user?: User
       message?: string
     }>('/auth/change-password', {
       currentPassword: payload.currentPassword,
       newPassword: payload.newPassword,
     })
+    if (response.data.accessToken) {
+      setAccessToken(response.data.accessToken)
+    }
     return {
       success: response.data.success ?? true,
       user: response.data.user,
