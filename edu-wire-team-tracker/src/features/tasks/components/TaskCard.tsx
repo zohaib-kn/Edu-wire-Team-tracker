@@ -7,12 +7,18 @@ import {
   Trash2,
   ArrowUpRight,
   CheckCircle2,
+  Clock,
 } from 'lucide-react'
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { TaskStatusSelect } from './TaskStatusSelect'
 import { TaskPriorityBadge } from './TaskPriorityBadge'
 import { Folder, type FolderEntry } from '@/components/ui/Folder'
-import { formatDateOnly, isTaskOverdue, isTaskDueToday } from '../utils/dateUtils'
+import {
+  formatDateOnly,
+  formatDeadline,
+  isTaskOverdue,
+  isTaskDueToday,
+} from '../utils/dateUtils'
 import { canPerformTaskAction } from '../utils/taskPermissions'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { cn } from '@/lib/utils/cn'
@@ -33,8 +39,8 @@ export function TaskCard({ task, onEdit, onDelete }: TaskCardProps) {
   const canEdit = canPerformTaskAction(user, 'edit', task)
   const canDelete = canPerformTaskAction(user, 'delete', task)
 
-  const overdue = isTaskOverdue(task.due, task.status)
-  const dueToday = isTaskDueToday(task.due, task.status)
+  const overdue = isTaskOverdue(task.due, task.status, task.deadlineAt)
+  const dueToday = isTaskDueToday(task.due, task.status, task.deadlineAt)
 
   const hasSubtasks =
     task.taskLevel === 'parent' && Boolean(task.subtasks && task.subtasks.length > 0)
@@ -58,73 +64,101 @@ export function TaskCard({ task, onEdit, onDelete }: TaskCardProps) {
         title: sub.title,
         description: `${sub.owner}${sub.responsibilityLabel ? ` • ${sub.responsibilityLabel}` : ''}`,
         content: (
-          <div className="box-border flex h-full flex-col justify-between p-3 select-none text-left bg-white rounded-inner shadow-xs">
-            <div>
-              {/* Top row: Status pill + Due date */}
-              <div className="flex items-center justify-between gap-1 mb-1.5">
+          <div className="box-border flex h-full flex-col justify-between p-2.5 select-none text-left bg-white rounded-[7px]">
+            <div className="min-w-0 space-y-1.5">
+              {/* Row 1: Minimalist Status (no background box, single line) */}
+              <div className="flex items-center justify-between gap-1">
                 <span
                   className={cn(
-                    'text-[9px] font-bold px-1.5 py-0.5 rounded-full border',
+                    'inline-flex items-center gap-1 text-[9px] font-semibold tracking-tight whitespace-nowrap',
                     isDone
-                      ? 'bg-tint-green-bg text-tint-green-text border-tint-green-border'
+                      ? 'text-emerald-600'
                       : isDoing
-                      ? 'bg-tint-amber-bg text-tint-amber-text border-tint-amber-border'
-                      : 'bg-tint-blue-bg text-tint-blue-text border-tint-blue-border',
+                        ? 'text-amber-600'
+                        : 'text-slate-600',
                   )}
                 >
-                  {isDone ? '✓ Done' : isDoing ? '⏳ Doing' : '○ To Do'}
+                  <span
+                    className={cn(
+                      'w-1.5 h-1.5 rounded-full shrink-0',
+                      isDone
+                        ? 'bg-emerald-500'
+                        : isDoing
+                          ? 'bg-amber-500'
+                          : 'bg-brand-blue',
+                    )}
+                  />
+                  <span>{isDone ? 'Done' : isDoing ? 'Doing' : 'To Do'}</span>
                 </span>
-                {sub.due && (
-                  <span className="text-[8px] text-text-muted font-medium">
-                    {formatDateOnly(sub.due)}
-                  </span>
-                )}
               </div>
 
-              {/* Subtask Title */}
+              {/* Row 2: Subtask Title */}
               <h5
                 className={cn(
-                  'text-xs font-bold leading-tight line-clamp-2 text-text-primary mb-1',
-                  isDone && 'line-through text-text-muted',
+                  'text-[11px] font-bold leading-[1.25] line-clamp-2 text-slate-900',
+                  isDone && 'line-through text-slate-400',
                 )}
                 title={sub.title}
               >
                 {sub.title}
               </h5>
 
-              {/* Assignee & Responsibility */}
-              <div className="space-y-0.5 mb-2">
-                <div className="flex items-center gap-1 text-[10px] text-text-muted font-medium">
-                  <User className="w-2.5 h-2.5 shrink-0 text-brand-blue" />
-                  <span className="truncate max-w-[85px]">{sub.owner}</span>
+              {/* Row 3: Assignee & Role/Label */}
+              <div className="space-y-1 min-w-0">
+                <div className="flex items-center gap-1 text-[9.5px] text-slate-500 font-medium min-w-0">
+                  <User className="w-2.5 h-2.5 shrink-0 text-slate-400" />
+                  <span className="truncate">{sub.owner}</span>
                 </div>
+
                 {sub.responsibilityLabel && (
-                  <span className="inline-block text-[8px] font-semibold px-1 py-0.5 bg-slate-100 text-slate-700 rounded border border-slate-200">
-                    {sub.responsibilityLabel}
-                  </span>
+                  <div className="min-w-0">
+                    <span className="inline-block max-w-full truncate text-[8.5px] font-medium px-1.5 py-0.5 bg-slate-50 text-slate-600 rounded border border-slate-200/80">
+                      {sub.responsibilityLabel}
+                    </span>
+                  </div>
                 )}
               </div>
 
-              {/* Document skeleton lines (matching ReactBits look) */}
-              <div className="space-y-1 opacity-40 mb-2">
-                <div className="h-1 bg-slate-400 rounded-full w-full" />
-                <div className="h-1 bg-slate-400 rounded-full w-4/5" />
-                <div className="h-1 bg-slate-400 rounded-full w-3/5" />
-              </div>
+              {/* Row 4: Clean Deadline / Due Date */}
+              {(sub.deadlineAt || sub.due) && (
+                <div className="flex items-center gap-1 text-[8px] leading-tight min-w-0">
+                  {sub.deadlineAt ? (
+                    <Clock className="w-2.5 h-2.5 shrink-0 text-brand-blue" />
+                  ) : (
+                    <Calendar className="w-2.5 h-2.5 shrink-0 text-slate-400" />
+                  )}
+                  <span
+                    className={cn(
+                      'truncate font-medium',
+                      sub.deadlineAt ? 'text-brand-blue' : 'text-slate-500',
+                    )}
+                    title={
+                      sub.deadlineAt
+                        ? formatDeadline(sub.deadlineAt, sub.deadlineTimezone || 'Asia/Kolkata', sub.due)
+                        : formatDateOnly(sub.due)
+                    }
+                  >
+                    {sub.deadlineAt
+                      ? formatDeadline(sub.deadlineAt, sub.deadlineTimezone || 'Asia/Kolkata', sub.due)
+                      : formatDateOnly(sub.due)}
+                  </span>
+                </div>
+              )}
             </div>
 
-            {/* Action button */}
+            {/* Bottom Row: Minimalistic Action Button (no blue bg, clearly visible) */}
             <button
               type="button"
+              onPointerDown={(e) => e.stopPropagation()}
               onClick={(e) => {
                 e.stopPropagation()
                 navigate(`/tasks/${encodeURIComponent(sub.id)}`)
               }}
-              className="w-full py-1 px-1.5 rounded bg-brand-blue hover:bg-brand-blue-hover text-white text-[9px] font-semibold flex items-center justify-center gap-1 transition-all shadow-xs cursor-pointer active:scale-95"
-              title="View Task Details"
+              className="w-full py-1 px-2 mt-1.5 rounded-md bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-950 border border-slate-200 hover:border-slate-300 text-[9px] font-medium flex items-center justify-center gap-1 transition-colors cursor-pointer active:scale-[0.98] shrink-0"
+              title="Open Task Details"
             >
-              <span>View Task Details</span>
-              <ArrowUpRight className="w-2.5 h-2.5" />
+              <span>View Task</span>
+              <ArrowUpRight className="w-2.5 h-2.5 text-slate-500 shrink-0" />
             </button>
           </div>
         ),
@@ -165,13 +199,13 @@ export function TaskCard({ task, onEdit, onDelete }: TaskCardProps) {
             task.status === 'done'
               ? '#10B981'
               : task.status === 'doing'
-              ? '#3B82F6'
-              : '#2563EB'
+                ? '#3B82F6'
+                : '#2563EB'
           }
           paperColor="#FFFFFF"
           tabPosition="right"
           openOn="click"
-          size={1.05}
+          size={1.15}
           bounce={0.4}
           peek={true}
           zoomOnClick={true}
@@ -192,8 +226,8 @@ export function TaskCard({ task, onEdit, onDelete }: TaskCardProps) {
         overdue
           ? 'border-tint-red-border/90 bg-tint-red-bg/15'
           : task.status === 'done'
-          ? 'border-tint-green-border/80 bg-tint-green-bg/10'
-          : 'border-border-subtle',
+            ? 'border-tint-green-border/80 bg-tint-green-bg/10'
+            : 'border-border-subtle',
       )}
     >
       <div>
@@ -328,6 +362,25 @@ export function TaskCard({ task, onEdit, onDelete }: TaskCardProps) {
               <CheckCircle2 className="w-3.5 h-3.5 text-[#15803D]" />
               <span>{formatDateOnly(task.doneAt)}</span>
             </div>
+          ) : task.deadlineAt ? (
+            <div
+              className={cn(
+                'flex items-center gap-1 shrink-0',
+                overdue && 'text-destructive font-semibold',
+                dueToday && 'text-brand-blue font-semibold',
+                !overdue && !dueToday && 'text-text-muted',
+              )}
+              title={
+                overdue
+                  ? 'Overdue'
+                  : dueToday
+                    ? 'Due Today'
+                    : `Deadline ${formatDeadline(task.deadlineAt, task.deadlineTimezone || 'Asia/Kolkata', task.due)}`
+              }
+            >
+              <Clock className="w-3.5 h-3.5" strokeWidth={1.75} />
+              <span>{formatDeadline(task.deadlineAt, task.deadlineTimezone || 'Asia/Kolkata', task.due)}</span>
+            </div>
           ) : task.due ? (
             <div
               className={cn(
@@ -340,8 +393,8 @@ export function TaskCard({ task, onEdit, onDelete }: TaskCardProps) {
                 overdue
                   ? 'Overdue'
                   : dueToday
-                  ? 'Due Today'
-                  : `Due on ${formatDateOnly(task.due)}`
+                    ? 'Due Today'
+                    : `Due on ${formatDateOnly(task.due)}`
               }
             >
               <Calendar className="w-3.5 h-3.5" strokeWidth={1.75} />

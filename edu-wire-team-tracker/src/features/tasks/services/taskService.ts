@@ -49,6 +49,10 @@ export const taskService = {
     if (filters?.reporting) params.reporting = filters.reporting
     if (filters?.reportingManager) params.reportingManager = filters.reportingManager
     if (filters?.due && filters.due !== 'all') params.due = filters.due
+    if (filters?.startDate) params.startDate = filters.startDate
+    if (filters?.endDate) params.endDate = filters.endDate
+    if (filters?.priority && filters.priority !== 'all') params.priority = filters.priority
+    if (filters?.taskLevel && filters.taskLevel !== 'all') params.taskLevel = filters.taskLevel
     if (filters?.q && filters.q.trim()) params.q = filters.q.trim()
     if (filters?.page) params.page = filters.page
     if (filters?.limit) params.limit = filters.limit

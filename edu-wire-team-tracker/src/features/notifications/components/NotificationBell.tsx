@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Bell, CheckCheck, Inbox, Check } from 'lucide-react'
+import { Bell, CheckCheck, Inbox, Check, AlarmClock, AlertTriangle } from 'lucide-react'
 import { useNotifications, useMarkAsRead, useMarkAllRead } from '../hooks/useNotifications'
 import type { AppNotification } from '../types/notification.types'
 
@@ -145,6 +145,9 @@ export function NotificationBell() {
             ) : (
               notifications.map((notif) => {
                 const isUnread = notif.status === 'queued'
+                const isWarning = notif.type === 'deadline_warning'
+                const isEscalation = notif.type === 'deadline_escalation'
+
                 return (
                   <div
                     key={notif.id}
@@ -157,27 +160,43 @@ export function NotificationBell() {
                       }
                     }}
                     className={`w-full p-4 text-left transition-colors cursor-pointer flex items-start gap-3 hover:bg-slate-50/80 group ${
-                      isUnread ? 'bg-tint-blue-bg/20' : 'bg-surface'
+                      isUnread
+                        ? isWarning
+                          ? 'bg-amber-50/40'
+                          : isEscalation
+                            ? 'bg-rose-50/40'
+                            : 'bg-tint-blue-bg/20'
+                        : 'bg-surface'
                     }`}
                   >
                     {/* Unread Indicator Dot */}
                     <div className="pt-1.5 shrink-0">
                       <span
                         className={`block w-2 h-2 rounded-full ${
-                          isUnread ? 'bg-brand-blue' : 'bg-transparent'
+                          !isUnread
+                            ? 'bg-transparent'
+                            : isWarning
+                              ? 'bg-amber-500 ring-2 ring-amber-100'
+                              : isEscalation
+                                ? 'bg-rose-500 ring-2 ring-rose-100'
+                                : 'bg-brand-blue'
                         }`}
                       />
                     </div>
 
                     {/* Content */}
                     <div className="flex-1 min-w-0">
-                      <p
-                        className={`text-xs ${
-                          isUnread ? 'font-semibold text-text-primary' : 'font-medium text-text-muted'
-                        } truncate`}
-                      >
-                        {notif.title}
-                      </p>
+                      <div className="flex items-center gap-1.5">
+                        {isWarning && <AlarmClock className="w-3.5 h-3.5 text-amber-600 shrink-0" />}
+                        {isEscalation && <AlertTriangle className="w-3.5 h-3.5 text-rose-600 shrink-0" />}
+                        <p
+                          className={`text-xs ${
+                            isUnread ? 'font-semibold text-text-primary' : 'font-medium text-text-muted'
+                          } truncate`}
+                        >
+                          {notif.title}
+                        </p>
+                      </div>
                       {notif.body && (
                         <p className="text-[11px] text-text-muted mt-0.5 line-clamp-2 leading-relaxed">
                           {notif.body}

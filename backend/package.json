@@ -20,6 +20,8 @@
     "test:discussion": "tsx src/scripts/test-task-discussion.ts",
     "test:discussion-phase3": "tsx src/scripts/test-task-discussion-phase3.ts",
     "test:multi-assignee": "tsx src/scripts/test-multi-assignee-phase1.ts",
+    "test:deadline": "tsx src/scripts/test-deadline-phase1.ts",
+    "test:schedule": "tsx src/scripts/test-schedule-phase2.ts",
     "workers": "tsx src/workers/index.ts"
   },
   "keywords": [],

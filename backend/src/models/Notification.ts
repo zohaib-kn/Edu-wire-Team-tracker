@@ -18,6 +18,8 @@ export type NotificationType =
   | 'task_discussion_message'
   | 'daily_report'
   | 'weekly_summary'
+  | 'deadline_warning'
+  | 'deadline_escalation'
   | string
 
 export interface INotification extends Document {

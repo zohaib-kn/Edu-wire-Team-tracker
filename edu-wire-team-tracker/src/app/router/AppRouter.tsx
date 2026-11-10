@@ -10,6 +10,7 @@ import { RequirePasswordChange } from '@/components/auth/RequirePasswordChange'
 import { LoginPage } from '@/pages/LoginPage'
 import { ChangePasswordPage } from '@/pages/ChangePasswordPage'
 import { DashboardPage } from '@/pages/DashboardPage'
+import { SchedulePage } from '@/pages/SchedulePage'
 import { MyTasksPage } from '@/pages/MyTasksPage'
 import { TaskHistoryPage } from '@/pages/TaskHistoryPage'
 import { CreateTaskPage } from '@/pages/CreateTaskPage'
@@ -58,6 +59,10 @@ const router = createBrowserRouter([
       {
         path: 'dashboard',
         element: <DashboardPage />,
+      },
+      {
+        path: 'schedule',
+        element: <SchedulePage />,
       },
       {
         path: 'my-tasks',

@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Plus } from 'lucide-react'
+import { Plus, Clock } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -9,10 +9,11 @@ import { Select } from '@/components/ui/Select'
 import { Textarea } from '@/components/ui/Textarea'
 import { Alert } from '@/components/ui/Alert'
 import { Spinner } from '@/components/ui/Spinner'
+import { cn } from '@/lib/utils/cn'
 import { addSubtaskSchema, type AddSubtaskFormValues } from '../schemas/taskSchemas'
 import { useCreateSubtask } from '../hooks/useCreateSubtask'
 import { useTeamMembers } from '../hooks/useMetadata'
-import { getTodayDateStringKolkata } from '../utils/dateUtils'
+import { getTodayDateStringKolkata, formatTimeAMPM } from '../utils/dateUtils'
 import type { Task } from '../types/task.types'
 
 export interface AddSubtaskDialogProps {
@@ -20,6 +21,13 @@ export interface AddSubtaskDialogProps {
   onClose: () => void
   parentTask: Task
 }
+
+const TIME_PRESETS = [
+  { label: '10:00 AM', time: '10:00' },
+  { label: '1:00 PM', time: '13:00' },
+  { label: '5:00 PM', time: '17:00' },
+  { label: '7:00 PM', time: '19:00' },
+]
 
 export function AddSubtaskDialog({
   isOpen,
@@ -41,6 +49,9 @@ export function AddSubtaskDialog({
     responsibilityLabel: '',
     note: '',
     due: parentTask.due || getTodayDateStringKolkata(),
+    deadlineTime: '',
+    deadlineTimezone: 'Asia/Kolkata',
+    reminderMinutesBefore: null,
     priority: parentTask.priority || 'normal',
     isRequired: true,
   }
@@ -48,6 +59,8 @@ export function AddSubtaskDialog({
   const {
     register,
     handleSubmit,
+    control,
+    setValue,
     reset,
     formState: { errors, isSubmitting },
   } = useForm<AddSubtaskFormValues>({
@@ -55,6 +68,9 @@ export function AddSubtaskDialog({
     defaultValues,
     mode: 'onTouched',
   })
+
+  const selectedDeadlineTime = useWatch({ control, name: 'deadlineTime' }) || ''
+  const selectedReminder = useWatch({ control, name: 'reminderMinutesBefore' })
 
   const onSubmit = async (values: AddSubtaskFormValues) => {
     setSubmitError(null)
@@ -75,6 +91,11 @@ export function AddSubtaskDialog({
         responsibilityLabel: values.responsibilityLabel || undefined,
         note: values.note || undefined,
         due: values.due,
+        deadlineTime: values.deadlineTime || undefined,
+        deadlineTimezone: 'Asia/Kolkata',
+        reminderMinutesBefore: values.deadlineTime
+          ? (values.reminderMinutesBefore ?? 30)
+          : null,
         priority: values.priority,
         isRequired: values.isRequired,
       })
@@ -152,7 +173,9 @@ export function AddSubtaskDialog({
               >
                 <option value="">Select team member</option>
                 {teamMembers.map((m) => {
-                  const alreadyAssigned = existingOwnerIds.includes(m.id.toLowerCase()) || existingOwnerIds.includes(m.name.toLowerCase())
+                  const alreadyAssigned =
+                    existingOwnerIds.includes(m.id.toLowerCase()) ||
+                    existingOwnerIds.includes(m.name.toLowerCase())
                   return (
                     <option key={m.id} value={m.name || m.id} disabled={alreadyAssigned}>
                       {m.name} {alreadyAssigned ? '(Already assigned)' : ''}
@@ -195,24 +218,128 @@ export function AddSubtaskDialog({
             id="add-subtask-note"
             label="Work Instructions (Optional)"
             placeholder="Describe specific tasks, checklists, or reference links..."
-            rows={3}
+            rows={2}
             error={errors.note?.message}
             disabled={isSaving}
           />
         </div>
 
-        {/* 4. Schedule & Options */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
+        {/* 4. Due Date & Deadline Time */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <Input
               {...register('due')}
               id="add-subtask-due"
               type="date"
-              label="Due Date"
+              label="Subtask Due Date"
               required
               error={errors.due?.message}
               disabled={isSaving}
             />
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label
+                htmlFor="add-subtask-time"
+                className="block text-xs font-semibold uppercase tracking-wider text-slate-700"
+              >
+                Deadline Time <span className="text-slate-400 font-normal lowercase">(optional)</span>
+              </label>
+              {selectedDeadlineTime && (
+                <span className="text-[11px] font-semibold text-brand-blue bg-blue-50 px-2 py-0.5 rounded flex items-center gap-1">
+                  <Clock className="w-3 h-3" />
+                  <span>{formatTimeAMPM(selectedDeadlineTime)} IST</span>
+                </span>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <input
+                type="time"
+                id="add-subtask-time"
+                {...register('deadlineTime', {
+                  onChange: (e) => {
+                    const val = e.target.value
+                    if (val && !selectedReminder) {
+                      setValue('reminderMinutesBefore', 30, {
+                        shouldValidate: true,
+                        shouldDirty: true,
+                      })
+                    } else if (!val) {
+                      setValue('reminderMinutesBefore', null, {
+                        shouldValidate: true,
+                        shouldDirty: true,
+                      })
+                    }
+                  },
+                })}
+                disabled={isSaving}
+                className="h-10 px-3 bg-surface border border-border-subtle rounded-lg text-sm text-text-primary focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20 flex-1"
+              />
+              {selectedDeadlineTime && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setValue('deadlineTime', '', { shouldValidate: true, shouldDirty: true })
+                    setValue('reminderMinutesBefore', null, { shouldValidate: true, shouldDirty: true })
+                  }}
+                  className="h-10 px-2.5 text-xs font-medium text-slate-600 hover:text-slate-900 bg-white border border-slate-200 rounded-lg cursor-pointer"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+
+            {/* Quick Presets */}
+            <div className="flex flex-wrap items-center gap-1.5 mt-2">
+              <span className="text-[11px] text-slate-400">Presets:</span>
+              {TIME_PRESETS.map((preset) => (
+                <button
+                  key={preset.time}
+                  type="button"
+                  onClick={() => {
+                    setValue('deadlineTime', preset.time, { shouldValidate: true, shouldDirty: true })
+                    if (!selectedReminder) {
+                      setValue('reminderMinutesBefore', 30, { shouldValidate: true, shouldDirty: true })
+                    }
+                  }}
+                  className={cn(
+                    'text-[11px] px-2 py-0.5 rounded border transition-colors cursor-pointer',
+                    selectedDeadlineTime === preset.time
+                      ? 'bg-blue-50 border-brand-blue text-brand-blue font-semibold'
+                      : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50',
+                  )}
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+
+            {errors.deadlineTime?.message && (
+              <p className="mt-1 text-xs text-red-500">{errors.deadlineTime.message}</p>
+            )}
+          </div>
+        </div>
+
+        {/* 5. Reminder, Priority & Required Checkbox */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end pt-1">
+          <div>
+            <label
+              htmlFor="add-subtask-reminder"
+              className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5"
+            >
+              Advance Reminder
+            </label>
+            <Select
+              {...register('reminderMinutesBefore')}
+              id="add-subtask-reminder"
+              disabled={isSaving || !selectedDeadlineTime}
+            >
+              <option value="30">30 mins before (Default)</option>
+              <option value="60">60 mins before</option>
+              <option value="">No reminder</option>
+            </Select>
           </div>
 
           <div>

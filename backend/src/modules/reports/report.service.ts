@@ -93,6 +93,9 @@ export const reportService = {
     }
 
     const todayIST = getTodayDateIST()
+    const now = new Date()
+    const isTaskLate = (t: ITask) => (t.deadlineAt ? t.deadlineAt.getTime() < now.getTime() : t.due < todayIST)
+    const isTaskDueToday = (t: ITask) => t.due === todayIST && (!t.deadlineAt || t.deadlineAt.getTime() >= now.getTime())
 
     const tasks = await Task.find(query)
       .sort({ priority: -1, due: 1 })
@@ -104,8 +107,8 @@ export const reportService = {
 
     const totalCount = tasks.length
     const highPriorityCount = tasks.filter((t) => t.priority === 'high').length
-    const overdueCount = tasks.filter((t) => t.due < todayIST).length
-    const todayCount = tasks.filter((t) => t.due === todayIST).length
+    const overdueCount = tasks.filter(isTaskLate).length
+    const todayCount = tasks.filter(isTaskDueToday).length
 
     // Format current IST time
     const timeFormatter = new Intl.DateTimeFormat('en-IN', {
@@ -143,9 +146,9 @@ export const reportService = {
         const oName = ownerDoc && typeof ownerDoc === 'object' && 'name' in ownerDoc ? ownerDoc.name : 'Unassigned'
 
         let dueStatus = 'Upcoming'
-        if (task.due < todayIST) {
+        if (isTaskLate(task)) {
           dueStatus = 'OVERDUE'
-        } else if (task.due === todayIST) {
+        } else if (isTaskDueToday(task)) {
           dueStatus = 'DUE TODAY'
         }
 

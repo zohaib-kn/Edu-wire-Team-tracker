@@ -17,6 +17,12 @@ function getDefaultHeader(pathname: string): { title: string; subtitle: string }
       subtitle: "Overview of your team's tasks and progress",
     }
   }
+  if (pathname.startsWith('/schedule')) {
+    return {
+      title: 'Schedule',
+      subtitle: 'Timeline calendar and deadline task visualization',
+    }
+  }
   if (pathname.startsWith('/my-tasks')) {
     return {
       title: 'My Tasks',

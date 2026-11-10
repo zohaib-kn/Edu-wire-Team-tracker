@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
+import { AlarmClock, AlertTriangle, CheckCircle2, MessageSquare, ClipboardList, Eye, X } from 'lucide-react'
 import { useNotifications, useMarkAsRead } from './useNotifications'
 import type { AppNotification } from '../types/notification.types'
 
@@ -29,7 +30,8 @@ function storeSeenId(id: string) {
 
 /**
  * Listens for newly arrived notifications and displays real-time
- * toast alerts to the Task Owner and Reporting Manager.
+ * toast alerts for task assignments, discussion messages, completion,
+ * and time-sensitive deadline warnings / escalations.
  */
 export function useNotificationToasts() {
   const { data } = useNotifications()
@@ -58,7 +60,7 @@ export function useNotificationToasts() {
           // Toast recent notifications even on initial load/refresh (within 3 mins)
           seenIdsRef.current.add(notif.id)
           storeSeenId(notif.id)
-          displayAssignmentToast(notif, navigate, markAsRead)
+          displayDeadlineAlertToast(notif, navigate, markAsRead)
         } else {
           // Record older or already-seen notifications as seen without toasting
           seenIdsRef.current.add(notif.id)
@@ -76,32 +78,40 @@ export function useNotificationToasts() {
     newNotifications.forEach((notif) => {
       seenIdsRef.current.add(notif.id)
       storeSeenId(notif.id)
-      displayAssignmentToast(notif, navigate, markAsRead)
+      displayDeadlineAlertToast(notif, navigate, markAsRead)
     })
   }, [data, navigate, markAsRead])
 }
 
 /**
- * Renders an interactive toast alert using react-hot-toast matching design tokens.
+ * Renders an interactive toast alert matching Edu Wire's clean blue-and-white design system.
+ * Includes dedicated styling for deadline advance warnings and escalations with AlarmClock icon.
  */
-function displayAssignmentToast(
+function displayDeadlineAlertToast(
   notif: AppNotification,
   navigate: (path: string) => void,
   markAsRead: (id: string) => void,
 ) {
+  const isWarning = notif.type === 'deadline_warning'
+  const isEscalation = notif.type === 'deadline_escalation'
   const isOwner = notif.type === 'task_assigned'
   const isDiscussion = notif.type === 'task_discussion_message'
   const isCompleted = notif.type === 'task_completed'
 
   const title =
     notif.title ||
-    (isCompleted
-      ? 'Task Completed 🎉'
-      : isDiscussion
-        ? 'New Task Update'
-        : isOwner
-          ? 'New Task Assigned'
-          : 'New Task Under Your Supervision')
+    (isWarning
+      ? 'Task Deadline Warning'
+      : isEscalation
+        ? 'Deadline Reached'
+        : isCompleted
+          ? 'Task Completed 🎉'
+          : isDiscussion
+            ? 'New Task Update'
+            : isOwner
+              ? 'New Task Assigned'
+              : 'New Task Under Your Supervision')
+
   const body = notif.body || 'A new update requires your attention.'
 
   toast.custom(
@@ -109,7 +119,13 @@ function displayAssignmentToast(
       <div
         className={`${
           t.visible ? 'animate-in fade-in zoom-in-95' : 'animate-out fade-out'
-        } max-w-md w-full bg-surface shadow-dropdown rounded-inner pointer-events-auto flex border border-border-subtle overflow-hidden cursor-pointer hover:bg-slate-50/80 transition-colors`}
+        } max-w-md w-full bg-white shadow-lg rounded-xl pointer-events-auto flex border ${
+          isWarning
+            ? 'border-amber-300 ring-1 ring-amber-200'
+            : isEscalation
+              ? 'border-rose-300 ring-1 ring-rose-200'
+              : 'border-slate-200'
+        } overflow-hidden cursor-pointer hover:bg-slate-50/80 transition-colors`}
         onClick={() => {
           markAsRead(notif.id)
           toast.dismiss(t.id)
@@ -119,30 +135,58 @@ function displayAssignmentToast(
         }}
       >
         <div className="flex-1 w-0 p-4">
-          <div className="flex items-start">
+          <div className="flex items-start gap-3">
             {/* Notification Badge Icon */}
             <div className="shrink-0 pt-0.5">
               <span
-                className={`inline-flex items-center justify-center w-9 h-9 rounded-nav text-lg border ${
-                  isCompleted
-                    ? 'bg-tint-green-bg text-tint-green-text border-tint-green-border'
-                    : isDiscussion
-                      ? 'bg-tint-blue-bg text-brand-blue border-tint-blue-border'
-                      : isOwner
-                        ? 'bg-tint-blue-bg text-tint-blue-text border-tint-blue-border'
-                        : 'bg-tint-amber-bg text-tint-amber-text border-tint-amber-border'
+                className={`inline-flex items-center justify-center w-9 h-9 rounded-lg border ${
+                  isWarning
+                    ? 'bg-amber-50 text-amber-600 border-amber-200'
+                    : isEscalation
+                      ? 'bg-rose-50 text-rose-600 border-rose-200'
+                      : isCompleted
+                        ? 'bg-emerald-50 text-emerald-600 border-emerald-200'
+                        : isDiscussion
+                          ? 'bg-blue-50 text-blue-600 border-blue-200'
+                          : isOwner
+                            ? 'bg-blue-50 text-blue-600 border-blue-200'
+                            : 'bg-amber-50 text-amber-600 border-amber-200'
                 }`}
               >
-                {isCompleted ? '🎉' : isDiscussion ? '💬' : isOwner ? '📋' : '👀'}
+                {isWarning ? (
+                  <AlarmClock className="w-5 h-5 animate-pulse" />
+                ) : isEscalation ? (
+                  <AlertTriangle className="w-5 h-5" />
+                ) : isCompleted ? (
+                  <CheckCircle2 className="w-5 h-5" />
+                ) : isDiscussion ? (
+                  <MessageSquare className="w-5 h-5" />
+                ) : isOwner ? (
+                  <ClipboardList className="w-5 h-5" />
+                ) : (
+                  <Eye className="w-5 h-5" />
+                )}
               </span>
             </div>
 
             {/* Notification Text */}
-            <div className="ml-3 flex-1">
-              <p className="text-xs font-semibold text-text-primary tracking-tight">{title}</p>
-              <p className="mt-1 text-xs text-text-muted leading-snug line-clamp-2">{body}</p>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <p className="text-xs font-semibold text-slate-900 tracking-tight truncate">{title}</p>
+                {isWarning && (
+                  <span className="px-1.5 py-0.5 text-[10px] font-semibold bg-amber-100 text-amber-800 rounded">
+                    Urgent
+                  </span>
+                )}
+                {isEscalation && (
+                  <span className="px-1.5 py-0.5 text-[10px] font-semibold bg-rose-100 text-rose-800 rounded">
+                    Overdue
+                  </span>
+                )}
+              </div>
+              <p className="mt-1 text-xs text-slate-600 leading-snug line-clamp-2">{body}</p>
               {notif.taskId && (
-                <p className="mt-1.5 text-[11px] font-semibold text-brand-blue flex items-center gap-1">
+                <p className="mt-1.5 text-[11px] font-semibold text-blue-600 flex items-center gap-1 hover:underline">
                   {isDiscussion
                     ? 'Click to view discussion \u2192'
                     : isCompleted
@@ -154,25 +198,26 @@ function displayAssignmentToast(
           </div>
         </div>
 
-        {/* Close Button */}
-        <div className="flex border-l border-border-subtle">
+        {/* Dismiss Button - only dismisses popup in current UI, never marks done or alters status */}
+        <div className="flex border-l border-slate-200">
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation()
               toast.dismiss(t.id)
             }}
-            className="w-full border border-transparent rounded-none rounded-r-inner px-4 flex items-center justify-center text-xs font-medium text-text-muted hover:text-text-primary focus:outline-none cursor-pointer"
+            className="w-full border border-transparent rounded-none rounded-r-xl px-3.5 flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors focus:outline-none cursor-pointer"
             aria-label="Dismiss notification"
+            title="Dismiss popup (stays in notifications)"
           >
-            &times;
+            <X className="w-4 h-4" />
           </button>
         </div>
       </div>
     ),
     {
       id: `toast-${notif.id}`,
-      duration: 8000,
+      duration: isWarning || isEscalation ? 12000 : 8000,
     },
   )
 }

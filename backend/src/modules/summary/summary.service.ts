@@ -65,17 +65,25 @@ export const summaryService = {
 
     const todayIST = getTodayDateIST()
     const sevenDaysAgo = getSevenDaysAgoIST()
+    const now = new Date()
 
     const [late, today, pending, done7Days, total] = await Promise.all([
       Task.countDocuments({
         ...baseFilter,
         status: { $ne: 'done' },
-        due: { $lt: todayIST },
+        $or: [
+          { deadlineAt: { $ne: null, $lt: now } },
+          { deadlineAt: null, due: { $lt: todayIST } },
+        ],
       }).exec(),
       Task.countDocuments({
         ...baseFilter,
         status: { $ne: 'done' },
         due: todayIST,
+        $or: [
+          { deadlineAt: null },
+          { deadlineAt: { $gte: now } },
+        ],
       }).exec(),
       Task.countDocuments({
         ...baseFilter,

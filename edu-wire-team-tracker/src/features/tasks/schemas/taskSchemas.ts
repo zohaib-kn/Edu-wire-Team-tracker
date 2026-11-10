@@ -1,11 +1,25 @@
 import { z } from 'zod'
 
+const reminderMinutesSchema = z.preprocess((val) => {
+  if (val === '' || val === null || val === undefined || val === 'null') return null
+  const num = typeof val === 'string' ? parseInt(val, 10) : val
+  return isNaN(num as number) ? null : num
+}, z.union([z.literal(30), z.literal(60), z.literal(0), z.null()]).optional())
+
 export const subtaskItemFormSchema = z.object({
   owner: z.string().min(1, 'Please select an assigned member').trim(),
   responsibilityLabel: z.string().trim().optional(),
   title: z.string().min(1, 'Subtask title is required').trim(),
   note: z.string().trim().optional(),
   due: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Please select a valid due date (YYYY-MM-DD)'),
+  deadlineTime: z
+    .string()
+    .regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'Deadline time must be in HH:mm format (00:00 to 23:59)')
+    .optional()
+    .or(z.literal(''))
+    .nullable(),
+  deadlineTimezone: z.string().optional(),
+  reminderMinutesBefore: reminderMinutesSchema,
   priority: z.enum(['normal', 'high']),
   isRequired: z.boolean().default(true),
 })
@@ -27,6 +41,14 @@ export const createTaskSchema = z
     due: z
       .string()
       .regex(/^\d{4}-\d{2}-\d{2}$/, 'Please select a valid due date (YYYY-MM-DD)'),
+    deadlineTime: z
+      .string()
+      .regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'Deadline time must be in HH:mm format (00:00 to 23:59)')
+      .optional()
+      .or(z.literal(''))
+      .nullable(),
+    deadlineTimezone: z.string().optional(),
+    reminderMinutesBefore: reminderMinutesSchema,
     priority: z.enum(['normal', 'high'], {
       message: 'Priority must be either normal or high',
     }),
@@ -95,6 +117,14 @@ export const editTaskSchema = z.object({
   due: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, 'Please select a valid due date (YYYY-MM-DD)'),
+  deadlineTime: z
+    .string()
+    .regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'Deadline time must be in HH:mm format (00:00 to 23:59)')
+    .optional()
+    .or(z.literal(''))
+    .nullable(),
+  deadlineTimezone: z.string().optional(),
+  reminderMinutesBefore: reminderMinutesSchema,
   priority: z.enum(['normal', 'high'], {
     message: 'Priority must be either normal or high',
   }),
@@ -110,6 +140,14 @@ export const addSubtaskSchema = z.object({
   responsibilityLabel: z.string().trim().optional(),
   note: z.string().trim().optional(),
   due: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Please select a valid due date (YYYY-MM-DD)'),
+  deadlineTime: z
+    .string()
+    .regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'Deadline time must be in HH:mm format (00:00 to 23:59)')
+    .optional()
+    .or(z.literal(''))
+    .nullable(),
+  deadlineTimezone: z.string().optional(),
+  reminderMinutesBefore: reminderMinutesSchema,
   priority: z.enum(['normal', 'high']).default('normal'),
   isRequired: z.boolean().default(true),
 })

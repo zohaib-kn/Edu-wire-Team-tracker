@@ -15,6 +15,8 @@ import {
   Plus,
   CheckCircle2,
   ArrowUpRight,
+  Clock,
+  Bell,
 } from 'lucide-react'
 import { cn } from '@/lib/utils/cn'
 import { useAuth } from '@/features/auth/hooks/useAuth'
@@ -30,7 +32,12 @@ import { TaskDeleteDialog } from '@/features/tasks/components/TaskDeleteDialog'
 import { ActivityTimeline } from '@/features/tasks/components/ActivityTimeline'
 import { TaskDiscussion } from '@/features/tasks/components/TaskDiscussion'
 import { AddSubtaskDialog } from '@/features/tasks/components/AddSubtaskDialog'
-import { formatDateOnly, isTaskOverdue, isTaskDueToday } from '@/features/tasks/utils/dateUtils'
+import {
+  formatDateOnly,
+  formatDeadline,
+  isTaskOverdue,
+  isTaskDueToday,
+} from '@/features/tasks/utils/dateUtils'
 import { canPerformTaskAction } from '@/features/tasks/utils/taskPermissions'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent } from '@/components/ui/Card'
@@ -77,8 +84,8 @@ export function TaskDetailPage() {
 
   const canEdit = canPerformTaskAction(user, 'edit', task)
   const canDelete = canPerformTaskAction(user, 'delete', task)
-  const overdue = task ? isTaskOverdue(task.due, task.status) : false
-  const dueToday = task ? isTaskDueToday(task.due, task.status) : false
+  const overdue = task ? isTaskOverdue(task.due, task.status, task.deadlineAt) : false
+  const dueToday = task ? isTaskDueToday(task.due, task.status, task.deadlineAt) : false
 
   const isParent = task?.taskLevel === 'parent' || Boolean(task?.subtasks && task.subtasks.length > 0)
   const isSubtask = task?.taskLevel === 'subtask' || Boolean(task?.parentTask)
@@ -333,7 +340,7 @@ export function TaskDetailPage() {
                   </div>
                 </div>
 
-                {/* Due Date */}
+                {/* Deadline or Due Date */}
                 <div className="flex items-start gap-2.5">
                   <div
                     className={`p-2 rounded-nav border ${
@@ -344,25 +351,45 @@ export function TaskDetailPage() {
                         : 'bg-slate-100 text-text-muted border-border-subtle'
                     }`}
                   >
-                    <Calendar className="w-4 h-4" strokeWidth={1.75} />
+                    {task.deadlineAt ? (
+                      <Clock className="w-4 h-4" strokeWidth={1.75} />
+                    ) : (
+                      <Calendar className="w-4 h-4" strokeWidth={1.75} />
+                    )}
                   </div>
                   <div>
                     <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted block">
-                      {isParent ? 'Overall Due Date' : 'Due Date'}
+                      {task.deadlineAt
+                        ? isParent
+                          ? 'Overall Deadline'
+                          : 'Deadline'
+                        : isParent
+                        ? 'Overall Due Date'
+                        : 'Due Date'}
                     </span>
-                    <span
-                      className={`text-sm font-medium ${
-                        overdue
-                          ? 'text-destructive font-semibold'
-                          : dueToday
-                          ? 'text-brand-blue font-semibold'
-                          : 'text-text-primary'
-                      }`}
-                    >
-                      {formatDateOnly(task.due)}
-                      {overdue && ' (Overdue)'}
-                      {dueToday && ' (Today)'}
-                    </span>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span
+                        className={`text-sm font-medium ${
+                          overdue
+                            ? 'text-destructive font-semibold'
+                            : dueToday
+                            ? 'text-brand-blue font-semibold'
+                            : 'text-text-primary'
+                        }`}
+                      >
+                        {task.deadlineAt
+                          ? formatDeadline(task.deadlineAt, task.deadlineTimezone || 'Asia/Kolkata', task.due)
+                          : formatDateOnly(task.due)}
+                        {overdue && ' (Overdue)'}
+                        {dueToday && ' (Today)'}
+                      </span>
+                      {task.reminderMinutesBefore && (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-600 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-full">
+                          <Bell className="w-3 h-3 text-slate-500" />
+                          <span>{task.reminderMinutesBefore}m before</span>
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -434,9 +461,23 @@ export function TaskDetailPage() {
                               <span>{st.owner}</span>
                             </div>
                             <div className="flex items-center gap-1">
-                              <Calendar className="w-3.5 h-3.5 text-text-muted" />
-                              <span>Due {formatDateOnly(st.due)}</span>
+                              {st.deadlineAt ? (
+                                <>
+                                  <Clock className="w-3.5 h-3.5 text-text-muted" />
+                                  <span>Deadline {formatDeadline(st.deadlineAt, st.deadlineTimezone || 'Asia/Kolkata', st.due)}</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Calendar className="w-3.5 h-3.5 text-text-muted" />
+                                  <span>Due {formatDateOnly(st.due)}</span>
+                                </>
+                              )}
                             </div>
+                            {st.reminderMinutesBefore && (
+                              <span className="text-[10px] text-slate-500 bg-slate-100 rounded px-1.5 py-0.5 border border-slate-200">
+                                🔔 {st.reminderMinutesBefore}m
+                              </span>
+                            )}
                             {st.doneAt && (
                               <div className="flex items-center gap-1 text-tint-green-text font-medium">
                                 <CheckCircle2 className="w-3.5 h-3.5 text-[#15803D]" />

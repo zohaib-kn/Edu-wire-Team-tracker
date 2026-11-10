@@ -7,8 +7,13 @@ import { User, type IUser } from '../../models/User.js'
 import { Role, type IRole } from '../../models/Role.js'
 import { permissionsService } from '../../services/permissions.service.js'
 import { notificationService } from '../../services/notification.service.js'
+import { deadlineNotificationService } from '../../services/deadlineNotification.service.js'
 import { AppError } from '../../utils/AppError.js'
-import { getTodayDateIST } from '../../utils/dateUtils.js'
+import {
+  getTodayDateIST,
+  resolveDeadlineInput,
+  formatUTCInTimezone,
+} from '../../utils/dateUtils.js'
 import type { AuthenticatedUserContext } from '../../types/auth.types.js'
 import type {
   CreateSubtaskInput,
@@ -25,6 +30,9 @@ export interface FormattedSubtaskItem {
   responsibilityLabel?: string | null
   note?: string
   due: string
+  deadlineAt?: string | null
+  deadlineTimezone?: string
+  reminderMinutesBefore?: number | null
   priority: 'normal' | 'high'
   status: 'todo' | 'doing' | 'done'
   isRequired: boolean
@@ -45,6 +53,9 @@ export interface FormattedParentRef {
   id: string
   title: string
   due: string
+  deadlineAt?: string | null
+  deadlineTimezone?: string
+  reminderMinutesBefore?: number | null
   priority: 'normal' | 'high'
   status: 'todo' | 'doing' | 'done'
 }
@@ -64,6 +75,9 @@ export interface FormattedTask {
   createdBy: string
   createdById: string
   due: string
+  deadlineAt?: string | null
+  deadlineTimezone?: string
+  reminderMinutesBefore?: number | null
   priority: 'normal' | 'high'
   status: 'todo' | 'doing' | 'done'
   taskLevel: 'standalone' | 'parent' | 'subtask'
@@ -228,6 +242,9 @@ function formatSubtaskItem(subtask: ITask): FormattedSubtaskItem {
     responsibilityLabel: subtask.responsibilityLabel || null,
     note: subtask.note || '',
     due: subtask.due,
+    deadlineAt: subtask.deadlineAt ? subtask.deadlineAt.toISOString() : null,
+    deadlineTimezone: subtask.deadlineTimezone || 'Asia/Kolkata',
+    reminderMinutesBefore: subtask.reminderMinutesBefore ?? null,
     priority: subtask.priority,
     status: subtask.status,
     isRequired: subtask.isRequired !== false,
@@ -250,8 +267,15 @@ function formatActivity(activity: IActivity): FormattedActivity {
   } else if (activity.action === 'deleted') {
     details = 'Task deleted'
   } else if (activity.action === 'edited') {
-    if (activity.from && typeof activity.from === 'object' && 'reportingManager' in (activity.from as any)) {
-      details = 'Reporting manager updated'
+    if (activity.from && typeof activity.from === 'object') {
+      const fromObj = activity.from as Record<string, unknown>
+      if ('reportingManager' in fromObj) {
+        details = 'Reporting manager updated'
+      } else if ('deadlineAt' in fromObj || 'due' in fromObj || 'deadlineTime' in fromObj) {
+        details = 'Task deadline updated'
+      } else {
+        details = 'Task details updated'
+      }
     } else {
       details = 'Task details updated'
     }
@@ -314,6 +338,9 @@ function formatTask(task: ITask, activities?: IActivity[], subtasks?: ITask[]): 
         id: pid,
         title: p.title || 'Parent Task',
         due: p.due || '',
+        deadlineAt: p.deadlineAt ? (typeof p.deadlineAt === 'string' ? p.deadlineAt : p.deadlineAt.toISOString()) : null,
+        deadlineTimezone: p.deadlineTimezone || 'Asia/Kolkata',
+        reminderMinutesBefore: p.reminderMinutesBefore ?? null,
         priority: p.priority || 'normal',
         status: p.status || 'todo',
       }
@@ -345,6 +372,9 @@ function formatTask(task: ITask, activities?: IActivity[], subtasks?: ITask[]): 
     createdBy: creatorName,
     createdById: (task.createdBy && typeof task.createdBy === 'object' && '_id' in task.createdBy ? task.createdBy._id : task.createdBy).toString(),
     due: task.due,
+    deadlineAt: task.deadlineAt ? task.deadlineAt.toISOString() : null,
+    deadlineTimezone: task.deadlineTimezone || 'Asia/Kolkata',
+    reminderMinutesBefore: task.reminderMinutesBefore ?? null,
     priority: task.priority,
     status: task.status,
     taskLevel,
@@ -464,6 +494,18 @@ export const taskService = {
       }
     }
 
+    // Resolve overall / standalone deadline data
+    const resolvedDeadline = resolveDeadlineInput(
+      {
+        due: input.due,
+        deadlineTime: input.deadlineTime,
+        deadlineAt: input.deadlineAt,
+        deadlineTimezone: input.deadlineTimezone,
+        reminderMinutesBefore: input.reminderMinutesBefore,
+      },
+      { isNewTask: true },
+    )
+
     // ----------------------------------------------------
     // BRANCH A: MULTI-ASSIGNEE PARENT TASK CREATION
     // ----------------------------------------------------
@@ -510,6 +552,9 @@ export const taskService = {
         title: string
         note?: string
         due: string
+        deadlineAt: Date | null
+        deadlineTimezone: string
+        reminderMinutesBefore: number | null
         priority: 'normal' | 'high'
         responsibilityLabel?: string | null
         isRequired: boolean
@@ -565,10 +610,43 @@ export const taskService = {
         }
         seenAssignees.add(subOwnerIdStr)
 
+        const subDue = st.due || resolvedDeadline.due
+        const subTime =
+          st.deadlineTime !== undefined
+            ? st.deadlineTime
+            : st.due && st.due !== resolvedDeadline.due
+            ? null
+            : input.deadlineTime
+        const subAt =
+          st.deadlineAt !== undefined
+            ? st.deadlineAt
+            : st.due && st.due !== resolvedDeadline.due
+            ? null
+            : resolvedDeadline.deadlineAt
+
+        const resolvedSubDeadline = resolveDeadlineInput(
+          {
+            due: subDue,
+            deadlineTime: subTime,
+            deadlineAt: subAt,
+            deadlineTimezone: st.deadlineTimezone || resolvedDeadline.deadlineTimezone,
+            reminderMinutesBefore:
+              st.reminderMinutesBefore !== undefined
+                ? st.reminderMinutesBefore
+                : st.due && st.due !== resolvedDeadline.due
+                ? null
+                : resolvedDeadline.reminderMinutesBefore,
+          },
+          { isNewTask: true },
+        )
+
         resolvedSubtasks.push({
           title: st.title,
           note: st.note || '',
-          due: st.due || input.due,
+          due: resolvedSubDeadline.due,
+          deadlineAt: resolvedSubDeadline.deadlineAt,
+          deadlineTimezone: resolvedSubDeadline.deadlineTimezone,
+          reminderMinutesBefore: resolvedSubDeadline.reminderMinutesBefore,
           priority: st.priority || input.priority || 'normal',
           responsibilityLabel: st.responsibilityLabel || null,
           isRequired: st.isRequired !== false,
@@ -589,7 +667,10 @@ export const taskService = {
           owner: parentOwnerDoc._id,
           reportingManager: finalReportingManagerId,
           createdBy: user.id,
-          due: input.due,
+          due: resolvedDeadline.due,
+          deadlineAt: resolvedDeadline.deadlineAt,
+          deadlineTimezone: resolvedDeadline.deadlineTimezone,
+          reminderMinutesBefore: resolvedDeadline.reminderMinutesBefore,
           priority: input.priority || 'normal',
           status: 'todo',
           taskLevel: 'parent',
@@ -615,6 +696,9 @@ export const taskService = {
             reportingManager: finalReportingManagerId,
             createdBy: user.id,
             due: st.due,
+            deadlineAt: st.deadlineAt,
+            deadlineTimezone: st.deadlineTimezone,
+            reminderMinutesBefore: st.reminderMinutesBefore,
             priority: st.priority,
             status: 'todo',
             taskLevel: 'subtask',
@@ -641,6 +725,17 @@ export const taskService = {
           await notificationService.handleParentTaskCreated(parentTask, createdSubtasks, user)
         } catch (notifErr: any) {
           console.warn('[TASK_SERVICE] Parent task notification warning:', notifErr.message)
+        }
+
+        // Schedule independent deadline reminder & escalation jobs for each actionable subtask
+        for (const sub of createdSubtasks) {
+          if (sub.deadlineAt) {
+            try {
+              await deadlineNotificationService.scheduleTaskDeadlineJobs(sub)
+            } catch (dErr: any) {
+              console.warn('[TASK_SERVICE] Subtask deadline schedule warning:', dErr.message)
+            }
+          }
         }
       } catch (creationError) {
         // Rollback created documents
@@ -742,7 +837,10 @@ export const taskService = {
       owner: ownerDoc._id,
       reportingManager: finalReportingManagerId,
       createdBy: user.id,
-      due: input.due,
+      due: resolvedDeadline.due,
+      deadlineAt: resolvedDeadline.deadlineAt,
+      deadlineTimezone: resolvedDeadline.deadlineTimezone,
+      reminderMinutesBefore: resolvedDeadline.reminderMinutesBefore,
       priority: input.priority || 'normal',
       status: 'todo',
       taskLevel: 'standalone',
@@ -764,6 +862,15 @@ export const taskService = {
       await notificationService.handleTaskCreated(newTask)
     } catch (notifErr: any) {
       console.warn('[TASK_SERVICE] Notification queue warning on task creation:', notifErr.message)
+    }
+
+    // Schedule delayed deadline warning & escalation jobs
+    if (newTask.deadlineAt) {
+      try {
+        await deadlineNotificationService.scheduleTaskDeadlineJobs(newTask)
+      } catch (deadlineErr: any) {
+        console.warn('[TASK_SERVICE] Deadline schedule warning:', deadlineErr.message)
+      }
     }
 
     // Populate and return
@@ -878,6 +985,29 @@ export const taskService = {
       await parent.save()
     }
 
+    const resolvedSubDeadline = resolveDeadlineInput(
+      {
+        due: input.due || parent.due,
+        deadlineTime:
+          input.deadlineTime !== undefined
+            ? input.deadlineTime
+            : input.due
+            ? null
+            : parent.deadlineAt
+            ? formatUTCInTimezone(parent.deadlineAt, parent.deadlineTimezone || 'Asia/Kolkata').time
+            : null,
+        deadlineAt: input.deadlineAt !== undefined ? input.deadlineAt : (input.due ? null : parent.deadlineAt),
+        deadlineTimezone: input.deadlineTimezone || parent.deadlineTimezone || 'Asia/Kolkata',
+        reminderMinutesBefore:
+          input.reminderMinutesBefore !== undefined
+            ? input.reminderMinutesBefore
+            : input.due
+            ? null
+            : parent.reminderMinutesBefore,
+      },
+      { isNewTask: true },
+    )
+
     // Create subtask
     const newSubtask = await Task.create({
       title: input.title,
@@ -887,7 +1017,10 @@ export const taskService = {
       owner: ownerDoc._id,
       reportingManager: parent.reportingManager,
       createdBy: user.id,
-      due: input.due || parent.due,
+      due: resolvedSubDeadline.due,
+      deadlineAt: resolvedSubDeadline.deadlineAt,
+      deadlineTimezone: resolvedSubDeadline.deadlineTimezone,
+      reminderMinutesBefore: resolvedSubDeadline.reminderMinutesBefore,
       priority: input.priority || parent.priority || 'normal',
       status: 'todo',
       taskLevel: 'subtask',
@@ -919,6 +1052,14 @@ export const taskService = {
       await notificationService.handleSubtaskAdded(parent, newSubtask, user)
     } catch (notifErr: any) {
       console.warn('[TASK_SERVICE] Subtask notification warning:', notifErr.message)
+    }
+
+    if (newSubtask.deadlineAt) {
+      try {
+        await deadlineNotificationService.scheduleTaskDeadlineJobs(newSubtask)
+      } catch (deadlineErr: any) {
+        console.warn('[TASK_SERVICE] Subtask deadline schedule warning:', deadlineErr.message)
+      }
     }
 
     // Return populated subtask
@@ -1022,14 +1163,36 @@ export const taskService = {
       filter.taskLevel = query.taskLevel
     }
 
-    // Due filter (using Asia/Kolkata date)
+    // Date range filter (startDate & endDate in YYYY-MM-DD format)
+    if (query.startDate && query.endDate) {
+      filter.due = { $gte: query.startDate, $lte: query.endDate }
+    } else if (query.startDate) {
+      filter.due = { $gte: query.startDate }
+    } else if (query.endDate) {
+      filter.due = { $lte: query.endDate }
+    }
+
+    // Priority filter
+    if (query.priority && query.priority !== 'all') {
+      filter.priority = query.priority
+    }
+
+    // Due filter (using Asia/Kolkata date & exact deadlines)
     const todayIST = getTodayDateIST()
+    const now = new Date()
     if (query.due === 'today') {
+      filter.status = { $ne: 'done' }
       filter.due = todayIST
-      filter.status = { $ne: 'done' }
+      filter.$or = [
+        { deadlineAt: null },
+        { deadlineAt: { $gte: now } },
+      ]
     } else if (query.due === 'late') {
-      filter.due = { $lt: todayIST }
       filter.status = { $ne: 'done' }
+      filter.$or = [
+        { deadlineAt: { $ne: null, $lt: now } },
+        { deadlineAt: null, due: { $lt: todayIST } },
+      ]
     }
 
     // Search query q
@@ -1055,7 +1218,7 @@ export const taskService = {
         .populate('owner')
         .populate('reportingManager')
         .populate('createdBy')
-        .populate({ path: 'parentTask', select: 'title due priority status' })
+        .populate({ path: 'parentTask', select: 'title due priority status deadlineAt deadlineTimezone reminderMinutesBefore' })
         .exec(),
       Task.countDocuments(filter).exec(),
     ])
@@ -1199,9 +1362,102 @@ export const taskService = {
       task.note = input.note
     }
 
-    if (input.due !== undefined && input.due !== task.due) {
-      changes.due = { from: task.due, to: input.due }
-      task.due = input.due
+    // Deadline authorization check:
+    // Unauthorized employees cannot extend or modify task deadlines to avoid an overdue state.
+    const isDeadlineTouched =
+      input.due !== undefined ||
+      input.deadlineTime !== undefined ||
+      input.deadlineAt !== undefined ||
+      input.deadlineTimezone !== undefined ||
+      input.reminderMinutesBefore !== undefined
+
+    if (isDeadlineTouched) {
+      const isSuperAdmin = user.role === 'Super Admin'
+      const isCreator = task.createdBy.toString() === user.id.toString()
+      const isReportingManager =
+        task.reportingManager && task.reportingManager.toString() === user.id.toString()
+      const isTeamLead =
+        user.role === 'Team Lead' &&
+        user.teams &&
+        user.teams.some((t: any) => t.toString() === task.team.toString())
+      const isBranchAdmin =
+        user.role === 'Branch Admin' &&
+        user.branchId &&
+        user.branchId.toString() === task.branch.toString()
+
+      const isAuthorizedToChangeDeadline =
+        isSuperAdmin || isCreator || isReportingManager || isTeamLead || isBranchAdmin
+
+      if (!isAuthorizedToChangeDeadline) {
+        throw AppError.forbidden(
+          'Unauthorized to modify task deadline. Only managers or the task creator can change deadlines.',
+          'DEADLINE_UPDATE_FORBIDDEN',
+        )
+      }
+
+      let currentDeadlineTime: string | null = null
+      if (task.deadlineAt) {
+        currentDeadlineTime = formatUTCInTimezone(
+          task.deadlineAt,
+          task.deadlineTimezone || 'Asia/Kolkata',
+        ).time
+      }
+
+      const targetDue = input.due !== undefined ? input.due : task.due
+      let targetTime: string | null | undefined
+      if (input.deadlineTime !== undefined) {
+        targetTime = input.deadlineTime
+      } else if (input.deadlineAt !== undefined) {
+        targetTime = input.deadlineAt
+          ? formatUTCInTimezone(
+              new Date(input.deadlineAt),
+              input.deadlineTimezone || task.deadlineTimezone || 'Asia/Kolkata',
+            ).time
+          : null
+      } else {
+        targetTime = currentDeadlineTime
+      }
+
+      const resolvedDeadline = resolveDeadlineInput({
+        due: targetDue,
+        deadlineTime: targetTime,
+        deadlineAt: input.deadlineAt,
+        deadlineTimezone: input.deadlineTimezone || task.deadlineTimezone || 'Asia/Kolkata',
+        reminderMinutesBefore:
+          input.reminderMinutesBefore !== undefined
+            ? input.reminderMinutesBefore
+            : task.reminderMinutesBefore,
+      })
+
+      if (resolvedDeadline.due !== task.due) {
+        changes.due = { from: task.due, to: resolvedDeadline.due }
+        task.due = resolvedDeadline.due
+      }
+
+      const oldDeadlineAtIso = task.deadlineAt ? task.deadlineAt.toISOString() : null
+      const newDeadlineAtIso = resolvedDeadline.deadlineAt
+        ? resolvedDeadline.deadlineAt.toISOString()
+        : null
+      if (oldDeadlineAtIso !== newDeadlineAtIso) {
+        changes.deadlineAt = { from: oldDeadlineAtIso, to: newDeadlineAtIso }
+        task.deadlineAt = resolvedDeadline.deadlineAt
+      }
+
+      if (resolvedDeadline.deadlineTimezone !== (task.deadlineTimezone || 'Asia/Kolkata')) {
+        changes.deadlineTimezone = {
+          from: task.deadlineTimezone || 'Asia/Kolkata',
+          to: resolvedDeadline.deadlineTimezone,
+        }
+        task.deadlineTimezone = resolvedDeadline.deadlineTimezone
+      }
+
+      if (resolvedDeadline.reminderMinutesBefore !== (task.reminderMinutesBefore ?? null)) {
+        changes.reminderMinutesBefore = {
+          from: task.reminderMinutesBefore ?? null,
+          to: resolvedDeadline.reminderMinutesBefore,
+        }
+        task.reminderMinutesBefore = resolvedDeadline.reminderMinutesBefore
+      }
     }
 
     if (input.priority !== undefined && input.priority !== task.priority) {
@@ -1374,6 +1630,17 @@ export const taskService = {
         }
       }
 
+      if (changes.deadlineAt || changes.reminderMinutesBefore || changes.due || changes.owner) {
+        try {
+          const oldDeadline = changes.deadlineAt
+            ? (changes.deadlineAt.from as string | Date | null | undefined)
+            : task.deadlineAt
+          await deadlineNotificationService.handleTaskDeadlineRescheduled(task, oldDeadline)
+        } catch (reschedErr: any) {
+          console.warn('[TASK_SERVICE] Deadline reschedule warning:', reschedErr.message)
+        }
+      }
+
       // If isRequired changed on a subtask, recalculate parent status
       if (isRequiredChanged && task.parentTask) {
         const pId = getParentTaskId(task.parentTask)
@@ -1454,7 +1721,7 @@ export const taskService = {
         .populate('owner')
         .populate('reportingManager')
         .populate('createdBy')
-        .populate({ path: 'parentTask', select: 'title due priority status' })
+        .populate({ path: 'parentTask', select: 'title due priority status deadlineAt deadlineTimezone reminderMinutesBefore' })
         .exec()
       return formatTask(populated!)
     }
@@ -1484,6 +1751,18 @@ export const taskService = {
         await notificationService.handleTaskCompleted(task, { id: user.id, name: user.name })
       } catch (notifErr: any) {
         console.warn('[TASK_SERVICE] Notification warning on task completion:', notifErr.message)
+      }
+      try {
+        await deadlineNotificationService.handleTaskCompleted(task)
+      } catch (dErr: any) {
+        console.warn('[TASK_SERVICE] Deadline cancellation warning on completion:', dErr.message)
+      }
+    } else if (oldStatus === 'done' && status !== 'done') {
+      // Reopened task: re-evaluate deadline
+      try {
+        await deadlineNotificationService.handleTaskReopened(task)
+      } catch (dErr: any) {
+        console.warn('[TASK_SERVICE] Deadline reschedule warning on reopening:', dErr.message)
       }
     }
 
@@ -1566,6 +1845,17 @@ export const taskService = {
         await syncParentStatusFromSubtasks(pId)
       }
     }
+
+    // Cancel scheduled deadline reminder jobs
+    try {
+      await deadlineNotificationService.cancelTaskDeadlineJobs(task._id.toString(), task.deadlineAt)
+      if (task.taskLevel === 'parent') {
+        const subtasks = await Task.find({ parentTask: task._id }).exec()
+        for (const sub of subtasks) {
+          await deadlineNotificationService.cancelTaskDeadlineJobs(sub._id.toString(), sub.deadlineAt)
+        }
+      }
+    } catch (dErr: any) {}
 
     return {
       success: true,

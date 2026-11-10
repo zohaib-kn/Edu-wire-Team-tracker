@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useForm, useWatch, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Plus, Trash2, User, Layers } from 'lucide-react'
+import { Plus, Trash2, User, Layers, Clock, Lock } from 'lucide-react'
 import { Sheet } from '@/components/ui/Sheet'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -25,7 +25,11 @@ import {
   useBranchSupervisors,
 } from '../hooks/useMetadata'
 import { useAuth } from '@/features/auth/hooks/useAuth'
-import { getTodayDateStringKolkata } from '../utils/dateUtils'
+import {
+  getTodayDateStringKolkata,
+  formatTimeAMPM,
+  formatUTCInTimezone,
+} from '../utils/dateUtils'
 import type { Task } from '../types/task.types'
 
 export interface TaskFormSheetProps {
@@ -33,6 +37,13 @@ export interface TaskFormSheetProps {
   onClose: () => void
   taskToEdit?: Task | null
 }
+
+const TIME_PRESETS = [
+  { label: '10:00 AM', time: '10:00' },
+  { label: '1:00 PM', time: '13:00' },
+  { label: '5:00 PM', time: '17:00' },
+  { label: '7:00 PM', time: '19:00' },
+]
 
 function TaskFormSheetInner({
   onClose,
@@ -70,22 +81,60 @@ function TaskFormSheetInner({
     return user?.branchId || (user as any)?.branch || branches[0]?.id || ''
   }, [taskToEdit, isSuperAdmin, branches, user])
 
-  const defaultValues: CreateTaskFormValues = {
-    mode: 'single',
-    title: taskToEdit?.title || '',
-    note: taskToEdit?.note || '',
-    branch: initialBranch,
-    team: taskToEdit?.team || (allTeams[0]?.id || ''),
-    owner: taskToEdit?.owner || '',
-    reportingManager: taskToEdit?.reportingManager || '',
-    due: taskToEdit?.due
-      ? taskToEdit.due.includes('T')
-        ? taskToEdit.due.split('T')[0]
-        : taskToEdit.due
-      : getTodayDateStringKolkata(),
-    priority: taskToEdit?.priority || 'normal',
-    subtasks: [],
-  }
+  // Deadline authorization: Members who are assignees cannot extend deadlines to avoid overdue state
+  const canModifyDeadline = useMemo(() => {
+    if (!isEditing || !taskToEdit) return true
+    if (
+      user?.role === 'Super Admin' ||
+      user?.role === 'Branch Admin' ||
+      user?.role === 'Team Lead'
+    ) {
+      return true
+    }
+    const isCreator = Boolean(
+      taskToEdit.createdBy &&
+        (taskToEdit.createdBy === user?.id || taskToEdit.createdBy === user?.name),
+    )
+    const isReportingManager = Boolean(
+      taskToEdit.reportingManager &&
+        (taskToEdit.reportingManager === user?.id ||
+          taskToEdit.reportingManager === user?.name),
+    )
+    return isCreator || isReportingManager
+  }, [isEditing, taskToEdit, user])
+
+  // Resolve initial deadline info from taskToEdit
+  const initialDeadline = useMemo(() => {
+    if (!taskToEdit?.deadlineAt) return null
+    return formatUTCInTimezone(
+      taskToEdit.deadlineAt,
+      taskToEdit.deadlineTimezone || 'Asia/Kolkata',
+    )
+  }, [taskToEdit])
+
+  const defaultValues: CreateTaskFormValues = useMemo(() => {
+    return {
+      mode: 'single',
+      title: taskToEdit?.title || '',
+      note: taskToEdit?.note || '',
+      branch: initialBranch,
+      team: taskToEdit?.team || (allTeams[0]?.id || ''),
+      owner: taskToEdit?.owner || '',
+      reportingManager: taskToEdit?.reportingManager || '',
+      due: taskToEdit?.due
+        ? taskToEdit.due.includes('T')
+          ? taskToEdit.due.split('T')[0]
+          : taskToEdit.due
+        : getTodayDateStringKolkata(),
+      deadlineTime: initialDeadline?.time || '',
+      deadlineTimezone: taskToEdit?.deadlineTimezone || 'Asia/Kolkata',
+      reminderMinutesBefore:
+        (taskToEdit?.reminderMinutesBefore as any) ??
+        (initialDeadline?.time ? 30 : null),
+      priority: taskToEdit?.priority || 'normal',
+      subtasks: [],
+    }
+  }, [taskToEdit, initialBranch, allTeams, initialDeadline])
 
   const {
     register,
@@ -100,17 +149,26 @@ function TaskFormSheetInner({
     mode: 'onTouched',
   })
 
+  // Synchronize values when taskToEdit changes
+  useEffect(() => {
+    if (isEditing && taskToEdit) {
+      reset(defaultValues)
+    }
+  }, [taskToEdit, isEditing, reset, defaultValues])
+
   const { fields, append, remove, replace } = useFieldArray({
     control,
     name: 'subtasks',
   })
 
-  // Watch branch, team, owner, due date, and subtasks
+  // Watch branch, team, owner, due date, deadline, and subtasks
   const selectedBranch = useWatch({ control, name: 'branch' }) || initialBranch
   const selectedTeam = useWatch({ control, name: 'team' }) || ''
   const selectedOwner = useWatch({ control, name: 'owner' }) || ''
   const selectedDue = useWatch({ control, name: 'due' }) || getTodayDateStringKolkata()
   const selectedPriority = useWatch({ control, name: 'priority' }) || 'normal'
+  const selectedDeadlineTime = useWatch({ control, name: 'deadlineTime' }) || ''
+  const selectedReminder = useWatch({ control, name: 'reminderMinutesBefore' })
   const watchedSubtasks = useWatch({ control, name: 'subtasks' }) || []
 
   // Filter teams by selected branch
@@ -175,7 +233,8 @@ function TaskFormSheetInner({
 
   const createTaskMutation = useCreateTask()
   const updateTaskMutation = useUpdateTask(taskToEdit?.id || '')
-  const isSaving = isSubmitting || createTaskMutation.isPending || updateTaskMutation.isPending
+  const isSaving =
+    isSubmitting || createTaskMutation.isPending || updateTaskMutation.isPending
 
   const handleCloseAttempt = () => {
     if (isDirty) {
@@ -204,6 +263,9 @@ function TaskFormSheetInner({
           title: '',
           note: '',
           due: selectedDue || getTodayDateStringKolkata(),
+          deadlineTime: '',
+          deadlineTimezone: 'Asia/Kolkata',
+          reminderMinutesBefore: null,
           priority: selectedPriority || 'normal',
           isRequired: true,
         },
@@ -213,6 +275,9 @@ function TaskFormSheetInner({
           title: '',
           note: '',
           due: selectedDue || getTodayDateStringKolkata(),
+          deadlineTime: '',
+          deadlineTimezone: 'Asia/Kolkata',
+          reminderMinutesBefore: null,
           priority: selectedPriority || 'normal',
           isRequired: true,
         },
@@ -243,8 +308,17 @@ function TaskFormSheetInner({
           reportingManager: isSuperAdmin ? values.reportingManager : undefined,
           due: values.due,
           priority: values.priority,
+          deadlineTime: values.deadlineTime ? values.deadlineTime : null,
+          deadlineTimezone: 'Asia/Kolkata',
+          reminderMinutesBefore: values.deadlineTime
+            ? (values.reminderMinutesBefore ?? 30)
+            : null,
         })
-      } else if (values.mode === 'multiple' && values.subtasks && values.subtasks.length > 0) {
+      } else if (
+        values.mode === 'multiple' &&
+        values.subtasks &&
+        values.subtasks.length > 0
+      ) {
         await createTaskMutation.mutateAsync({
           title: values.title,
           branch: values.branch,
@@ -253,6 +327,11 @@ function TaskFormSheetInner({
           due: values.due,
           priority: values.priority,
           note: values.note,
+          deadlineTime: values.deadlineTime || undefined,
+          deadlineTimezone: 'Asia/Kolkata',
+          reminderMinutesBefore: values.deadlineTime
+            ? (values.reminderMinutesBefore ?? 30)
+            : null,
           subtasks: values.subtasks.map((st) => ({
             title: st.title,
             owner: st.owner,
@@ -261,6 +340,11 @@ function TaskFormSheetInner({
             due: st.due || values.due,
             priority: st.priority || values.priority,
             isRequired: st.isRequired !== false,
+            deadlineTime: st.deadlineTime || undefined,
+            deadlineTimezone: 'Asia/Kolkata',
+            reminderMinutesBefore: st.deadlineTime
+              ? (st.reminderMinutesBefore ?? 30)
+              : null,
           })),
         })
       } else {
@@ -273,6 +357,11 @@ function TaskFormSheetInner({
           due: values.due,
           priority: values.priority,
           note: values.note,
+          deadlineTime: values.deadlineTime || undefined,
+          deadlineTimezone: 'Asia/Kolkata',
+          reminderMinutesBefore: values.deadlineTime
+            ? (values.reminderMinutesBefore ?? 30)
+            : null,
         })
       }
       reset()
@@ -328,7 +417,7 @@ function TaskFormSheetInner({
         }
         description={
           isEditing
-            ? `Editing task "${taskToEdit?.title}". Team and branch are locked.`
+            ? `Editing task "${taskToEdit?.title}". Scope is locked.`
             : mode === 'multiple'
             ? 'Create a parent task with multiple independently assigned employee subtasks.'
             : 'Fill in the details below to delegate and track a single-assignee task.'
@@ -367,7 +456,7 @@ function TaskFormSheetInner({
             </Alert>
           )}
 
-          {/* ── Mode Switcher (Create Mode Only) ── */}
+          {/* Mode Switcher (Create Mode Only) */}
           {!isEditing && (
             <div className="p-1 bg-slate-100 rounded-lg flex items-center gap-1 border border-slate-200/60">
               <button
@@ -400,16 +489,18 @@ function TaskFormSheetInner({
           )}
 
           {/* =========================================================================
-              SECTION A — TASK DETAILS / PARENT TASK DETAILS
+              SECTION A — TASK DETAILS
              ========================================================================= */}
           <div className="space-y-4">
             <div className="pb-1 border-b border-slate-100">
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                {mode === 'multiple' ? 'Section A — Parent Task Details' : 'Section A — Task Details'}
+                {mode === 'multiple'
+                  ? 'Section A — Parent Task Details'
+                  : 'Section A — Task Details'}
               </h3>
             </div>
 
-            {/* 1. Task Title */}
+            {/* Task Title (Single unique title input) */}
             <div>
               <Input
                 {...register('title')}
@@ -427,7 +518,7 @@ function TaskFormSheetInner({
               />
             </div>
 
-            {/* 2. Instructions / Note */}
+            {/* Instructions / Note */}
             <div>
               <Textarea
                 {...register('note')}
@@ -459,7 +550,7 @@ function TaskFormSheetInner({
               </h3>
             </div>
 
-            {/* 3. Branch Selection */}
+            {/* Branch Selection */}
             <div>
               {isEditing ? (
                 <div>
@@ -487,6 +578,9 @@ function TaskFormSheetInner({
                               title: '',
                               note: '',
                               due: selectedDue || getTodayDateStringKolkata(),
+                              deadlineTime: '',
+                              deadlineTimezone: 'Asia/Kolkata',
+                              reminderMinutesBefore: null,
                               priority: selectedPriority || 'normal',
                               isRequired: true,
                             },
@@ -496,6 +590,9 @@ function TaskFormSheetInner({
                               title: '',
                               note: '',
                               due: selectedDue || getTodayDateStringKolkata(),
+                              deadlineTime: '',
+                              deadlineTimezone: 'Asia/Kolkata',
+                              reminderMinutesBefore: null,
                               priority: selectedPriority || 'normal',
                               isRequired: true,
                             },
@@ -548,7 +645,7 @@ function TaskFormSheetInner({
               )}
             </div>
 
-            {/* 4. Team Selection */}
+            {/* Team Selection */}
             <div>
               {isEditing ? (
                 <div>
@@ -574,6 +671,9 @@ function TaskFormSheetInner({
                               title: '',
                               note: '',
                               due: selectedDue || getTodayDateStringKolkata(),
+                              deadlineTime: '',
+                              deadlineTimezone: 'Asia/Kolkata',
+                              reminderMinutesBefore: null,
                               priority: selectedPriority || 'normal',
                               isRequired: true,
                             },
@@ -583,6 +683,9 @@ function TaskFormSheetInner({
                               title: '',
                               note: '',
                               due: selectedDue || getTodayDateStringKolkata(),
+                              deadlineTime: '',
+                              deadlineTimezone: 'Asia/Kolkata',
+                              reminderMinutesBefore: null,
                               priority: selectedPriority || 'normal',
                               isRequired: true,
                             },
@@ -622,7 +725,7 @@ function TaskFormSheetInner({
               )}
             </div>
 
-            {/* 5. Reporting Manager Selection */}
+            {/* Reporting Manager Selection */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label
@@ -658,7 +761,7 @@ function TaskFormSheetInner({
                     ))}
                   </Select>
                   <span className="text-[11px] text-slate-400 mt-1 block">
-                    Super Admin may retain the default Team Lead or designate another eligible supervisor in this branch.
+                    Super Admin may retain default Team Lead or designate an authorized branch supervisor.
                   </span>
                 </div>
               ) : (
@@ -675,13 +778,13 @@ function TaskFormSheetInner({
           </div>
 
           {/* =========================================================================
-              SINGLE MODE: SINGLE TASK OWNER SELECTION
+              SECTION C — ASSIGNMENT
              ========================================================================= */}
-          {mode === 'single' && (
+          {mode === 'single' ? (
             <div className="space-y-4 pt-2">
               <div className="pb-1 border-b border-slate-100">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                  Section C — Task Assignment
+                  Section C — Assignment
                 </h3>
               </div>
 
@@ -690,7 +793,7 @@ function TaskFormSheetInner({
                   htmlFor="owner"
                   className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5"
                 >
-                  Task Owner <span className="text-red-500">*</span>
+                  Assigned To <span className="text-red-500">*</span>
                 </label>
                 {isLoadingMembers ? (
                   <div className="h-10 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-400 flex items-center gap-2">
@@ -727,24 +830,19 @@ function TaskFormSheetInner({
                   />
                 )}
                 <span className="text-[11px] text-slate-400 mt-1 block">
-                  The employee responsible for performing and completing this task.
+                  The employee directly responsible for executing this task.
                 </span>
               </div>
             </div>
-          )}
-
-          {/* =========================================================================
-              MULTIPLE MODE: INDIVIDUAL ASSIGNMENTS REPEATER
-             ========================================================================= */}
-          {mode === 'multiple' && (
+          ) : (
             <div className="space-y-4 pt-2">
               <div className="flex items-center justify-between pb-1 border-b border-slate-100">
                 <div>
                   <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                    Section C — Individual Assignments ({fields.length})
+                    Section C — Assignment ({fields.length} Subtasks)
                   </h3>
                   <p className="text-[11px] text-slate-400">
-                    Assign individual responsibilities to active team members.
+                    Assign individual responsibilities and specific deadlines to active team members.
                   </p>
                 </div>
                 <Button
@@ -758,6 +856,9 @@ function TaskFormSheetInner({
                       title: '',
                       note: '',
                       due: selectedDue || getTodayDateStringKolkata(),
+                      deadlineTime: '',
+                      deadlineTimezone: 'Asia/Kolkata',
+                      reminderMinutesBefore: null,
                       priority: selectedPriority || 'normal',
                       isRequired: true,
                     })
@@ -780,10 +881,12 @@ function TaskFormSheetInner({
                     ?.map((s, i) => (i !== index ? s?.owner : null))
                     .filter(Boolean) as string[]
 
+                  const subtaskTime = watchedSubtasks?.[index]?.deadlineTime
+
                   return (
                     <div
                       key={field.id}
-                      className="p-3.5 rounded-inner border border-slate-200 bg-slate-50/70 space-y-3 relative transition-all hover:border-slate-300"
+                      className="p-3.5 rounded-lg border border-slate-200 bg-slate-50/70 space-y-3 relative transition-all hover:border-slate-300"
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
@@ -825,7 +928,9 @@ function TaskFormSheetInner({
                             <option value="">Select team member</option>
                             {teamMembers.map((m) => {
                               const val = m.name || m.id
-                              const isTaken = otherAssignedOwners.includes(val) || otherAssignedOwners.includes(m.id)
+                              const isTaken =
+                                otherAssignedOwners.includes(val) ||
+                                otherAssignedOwners.includes(m.id)
                               return (
                                 <option key={m.id} value={val} disabled={isTaken}>
                                   {m.name} {isTaken ? '(Already assigned)' : ''}
@@ -837,11 +942,15 @@ function TaskFormSheetInner({
 
                         <div>
                           <Input
-                            {...register(`subtasks.${index}.responsibilityLabel` as const)}
+                            {...register(
+                              `subtasks.${index}.responsibilityLabel` as const,
+                            )}
                             id={`subtask-role-${index}`}
                             label="Responsibility / Role"
                             placeholder="e.g. Frontend Developer, QA"
-                            error={errors.subtasks?.[index]?.responsibilityLabel?.message}
+                            error={
+                              errors.subtasks?.[index]?.responsibilityLabel?.message
+                            }
                             disabled={isSaving}
                           />
                         </div>
@@ -853,7 +962,7 @@ function TaskFormSheetInner({
                           {...register(`subtasks.${index}.title` as const)}
                           id={`subtask-title-${index}`}
                           label="Subtask Title"
-                          placeholder="e.g. Build Login, Dashboard and Contacts UI"
+                          placeholder="e.g. Build Login & Contacts Module"
                           required
                           error={errors.subtasks?.[index]?.title?.message}
                           disabled={isSaving}
@@ -873,8 +982,8 @@ function TaskFormSheetInner({
                         />
                       </div>
 
-                      {/* Row 4: Due Date, Priority, Required */}
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+                      {/* Row 4: Due Date & Deadline Time */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                           <Input
                             {...register(`subtasks.${index}.due` as const)}
@@ -885,6 +994,74 @@ function TaskFormSheetInner({
                             error={errors.subtasks?.[index]?.due?.message}
                             disabled={isSaving}
                           />
+                        </div>
+
+                        <div>
+                          <div className="flex items-center justify-between mb-1">
+                            <label
+                              htmlFor={`subtask-time-${index}`}
+                              className="block text-xs font-semibold uppercase tracking-wider text-slate-700"
+                            >
+                              Deadline Time <span className="text-slate-400 font-normal lowercase">(opt)</span>
+                            </label>
+                            {subtaskTime && (
+                              <span className="text-[11px] font-semibold text-brand-blue bg-blue-50 px-1.5 py-0.5 rounded">
+                                {formatTimeAMPM(subtaskTime)} IST
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <input
+                              type="time"
+                              id={`subtask-time-${index}`}
+                              {...register(`subtasks.${index}.deadlineTime` as const, {
+                                onChange: (e) => {
+                                  if (e.target.value && !watchedSubtasks?.[index]?.reminderMinutesBefore) {
+                                    setValue(`subtasks.${index}.reminderMinutesBefore` as const, 30)
+                                  } else if (!e.target.value) {
+                                    setValue(`subtasks.${index}.reminderMinutesBefore` as const, null)
+                                  }
+                                },
+                              })}
+                              disabled={isSaving}
+                              className="h-10 px-3 bg-surface border border-border-subtle rounded-lg text-sm text-text-primary focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20 flex-1"
+                            />
+                            {subtaskTime && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setValue(`subtasks.${index}.deadlineTime` as const, '')
+                                  setValue(`subtasks.${index}.reminderMinutesBefore` as const, null)
+                                }}
+                                className="h-10 px-2 text-xs font-medium text-slate-500 hover:text-slate-700 bg-white border border-slate-200 rounded-lg cursor-pointer"
+                              >
+                                Clear
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Row 5: Reminder, Priority & Required Checkbox */}
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+                        <div>
+                          <label
+                            htmlFor={`subtask-reminder-${index}`}
+                            className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1"
+                          >
+                            Advance Reminder
+                          </label>
+                          <Select
+                            {...register(
+                              `subtasks.${index}.reminderMinutesBefore` as const,
+                            )}
+                            id={`subtask-reminder-${index}`}
+                            disabled={isSaving || !subtaskTime}
+                          >
+                            <option value="30">30 mins before (Default)</option>
+                            <option value="60">60 mins before</option>
+                            <option value="">No reminder</option>
+                          </Select>
                         </div>
 
                         <div>
@@ -903,7 +1080,9 @@ function TaskFormSheetInner({
                           <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-slate-700 select-none">
                             <input
                               type="checkbox"
-                              {...register(`subtasks.${index}.isRequired` as const)}
+                              {...register(
+                                `subtasks.${index}.isRequired` as const,
+                              )}
                               className="rounded text-brand-blue focus:ring-brand-blue"
                               disabled={isSaving}
                             />
@@ -928,6 +1107,9 @@ function TaskFormSheetInner({
                       title: '',
                       note: '',
                       due: selectedDue || getTodayDateStringKolkata(),
+                      deadlineTime: '',
+                      deadlineTimezone: 'Asia/Kolkata',
+                      reminderMinutesBefore: null,
                       priority: selectedPriority || 'normal',
                       isRequired: true,
                     })
@@ -942,27 +1124,48 @@ function TaskFormSheetInner({
           )}
 
           {/* =========================================================================
-              SECTION D — OVERALL SCHEDULE & PRIORITY
+              SECTION D — DEADLINE & REMINDER
              ========================================================================= */}
           <div className="space-y-4 pt-2">
-            <div className="pb-1 border-b border-slate-100">
+            <div className="pb-1 border-b border-slate-100 flex items-center justify-between">
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
                 {mode === 'multiple'
-                  ? 'Section D — Overall Schedule & Priority'
-                  : 'Section D — Schedule'}
+                  ? 'Section D — Parent Schedule & Reminder'
+                  : 'Section D — Deadline & Reminder'}
               </h3>
+              {!canModifyDeadline && (
+                <span className="flex items-center gap-1 text-[11px] font-medium text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                  <Lock className="w-3 h-3" />
+                  <span>Deadline Locked</span>
+                </span>
+              )}
             </div>
 
+            {!canModifyDeadline && (
+              <div className="p-3 rounded-lg bg-amber-50/80 border border-amber-200/80 text-amber-900 text-xs flex items-start gap-2.5">
+                <Lock className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-semibold block">Deadline modification restricted</span>
+                  <span className="text-amber-800">
+                    Only Team Leads, Reporting Managers, or the Task Creator are authorized to change deadlines.
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Row 1: Due Date & Priority */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Input
                   {...register('due')}
                   id="due"
                   type="date"
-                  label={mode === 'multiple' ? 'Overall Parent Due Date' : 'Due Date'}
+                  label={
+                    mode === 'multiple' ? 'Overall Parent Due Date' : 'Due Date'
+                  }
                   required
                   error={errors.due?.message}
-                  disabled={isSaving}
+                  disabled={isSaving || !canModifyDeadline}
                 />
               </div>
 
@@ -978,6 +1181,137 @@ function TaskFormSheetInner({
                   <option value="normal">Normal</option>
                   <option value="high">High</option>
                 </Select>
+              </div>
+            </div>
+
+            {/* Row 2: Deadline Time & Advance Reminder */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+              {/* Exact Deadline Time */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label
+                    htmlFor="deadlineTime"
+                    className="block text-xs font-semibold uppercase tracking-wider text-slate-700"
+                  >
+                    Deadline Time <span className="text-slate-400 font-normal lowercase">(optional)</span>
+                  </label>
+                  {selectedDeadlineTime && (
+                    <span className="text-[11px] font-semibold text-brand-blue bg-blue-50 px-2 py-0.5 rounded-md flex items-center gap-1">
+                      <Clock className="w-3 h-3" />
+                      <span>{formatTimeAMPM(selectedDeadlineTime)} IST</span>
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    type="time"
+                    id="deadlineTime"
+                    {...register('deadlineTime', {
+                      onChange: (e) => {
+                        const val = e.target.value
+                        if (val && !selectedReminder) {
+                          setValue('reminderMinutesBefore', 30, {
+                            shouldValidate: true,
+                            shouldDirty: true,
+                          })
+                        } else if (!val) {
+                          setValue('reminderMinutesBefore', null, {
+                            shouldValidate: true,
+                            shouldDirty: true,
+                          })
+                        }
+                      },
+                    })}
+                    disabled={isSaving || !canModifyDeadline}
+                    className="h-10 px-3 bg-surface border border-border-subtle rounded-lg text-sm text-text-primary focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/20 disabled:bg-slate-50 disabled:text-text-muted flex-1"
+                  />
+                  {selectedDeadlineTime && canModifyDeadline && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setValue('deadlineTime', '', {
+                          shouldValidate: true,
+                          shouldDirty: true,
+                        })
+                        setValue('reminderMinutesBefore', null, {
+                          shouldValidate: true,
+                          shouldDirty: true,
+                        })
+                      }}
+                      className="h-10 px-3 text-xs font-medium text-slate-600 hover:text-slate-900 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg transition-colors cursor-pointer"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+
+                {/* Quick Presets for clean, fast selection */}
+                {canModifyDeadline && (
+                  <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                    <span className="text-[11px] text-slate-400">Presets:</span>
+                    {TIME_PRESETS.map((preset) => (
+                      <button
+                        key={preset.time}
+                        type="button"
+                        onClick={() => {
+                          setValue('deadlineTime', preset.time, {
+                            shouldValidate: true,
+                            shouldDirty: true,
+                          })
+                          if (!selectedReminder) {
+                            setValue('reminderMinutesBefore', 30, {
+                              shouldValidate: true,
+                              shouldDirty: true,
+                            })
+                          }
+                        }}
+                        className={cn(
+                          'text-[11px] px-2 py-0.5 rounded border transition-colors cursor-pointer',
+                          selectedDeadlineTime === preset.time
+                            ? 'bg-blue-50 border-brand-blue text-brand-blue font-semibold'
+                            : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50',
+                        )}
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {errors.deadlineTime?.message && (
+                  <p className="mt-1 text-xs text-red-500">
+                    {errors.deadlineTime.message}
+                  </p>
+                )}
+                <span className="text-[11px] text-slate-400 mt-1 block">
+                  Preserves calendar due date and records exact UTC instant (Asia/Kolkata).
+                </span>
+              </div>
+
+              {/* Advance Reminder Policy */}
+              <div>
+                <label
+                  htmlFor="reminderMinutesBefore"
+                  className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5"
+                >
+                  Advance Reminder
+                </label>
+                <Select
+                  {...register('reminderMinutesBefore')}
+                  id="reminderMinutesBefore"
+                  disabled={isSaving || !canModifyDeadline || !selectedDeadlineTime}
+                  error={errors.reminderMinutesBefore?.message}
+                >
+                  <option value="30">30 minutes before (Default)</option>
+                  <option value="60">60 minutes before</option>
+                  <option value="">No advance reminder</option>
+                </Select>
+                <span className="text-[11px] text-slate-400 mt-1 block">
+                  {!selectedDeadlineTime
+                    ? 'Enter an exact deadline time above to enable advance reminders.'
+                    : 'System policy for automated upcoming-deadline alerts.'}
+                </span>
               </div>
             </div>
           </div>

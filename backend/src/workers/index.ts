@@ -9,6 +9,7 @@ import { User } from '../models/User.js'
 import { expoService } from '../services/expo.service.js'
 import { whatsappService } from '../services/whatsapp/whatsapp.service.js'
 import { notificationScheduler } from '../schedulers/notification.scheduler.js'
+import { deadlineNotificationService } from '../services/deadlineNotification.service.js'
 
 const activeWorkers: Worker[] = []
 
@@ -148,6 +149,16 @@ async function _initWorkerProcessors(): Promise<Worker[]> {
         return { success: true, jobType: 'overdue', ...res }
       }
 
+      if (job.data?.type === 'deadline_warning') {
+        const res = await deadlineNotificationService.processDeadlineWarning(job.data)
+        return { success: true, jobType: 'deadline_warning', ...res }
+      }
+
+      if (job.data?.type === 'deadline_escalation') {
+        const res = await deadlineNotificationService.processDeadlineEscalation(job.data)
+        return { success: true, jobType: 'deadline_escalation', ...res }
+      }
+
       return { success: true, processedAt: new Date().toISOString() }
     },
   })
@@ -265,6 +276,9 @@ export async function startWorkers(): Promise<Worker[]> {
   await connectDatabase()
   const workers = await _initWorkerProcessors()
   console.log(`[WORKERS] ✅ All ${workers.length} workers initialized successfully.`)
+  await deadlineNotificationService.reconcilePendingDeadlines().catch((err) => {
+    console.warn('[WORKERS] Warning reconciling deadlines on standalone start:', err.message)
+  })
   return workers
 }
 
@@ -277,6 +291,9 @@ export async function initWorkersInProcess(): Promise<Worker[]> {
   console.log('[WORKERS] 🔧 Initializing background workers in-process...')
   const workers = await _initWorkerProcessors()
   console.log(`[WORKERS] ✅ ${workers.length} in-process workers running.`)
+  await deadlineNotificationService.reconcilePendingDeadlines().catch((err) => {
+    console.warn('[WORKERS] Warning reconciling deadlines on in-process init:', err.message)
+  })
   return workers
 }
 

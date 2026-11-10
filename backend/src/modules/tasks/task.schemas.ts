@@ -21,6 +21,22 @@ export const subtaskInputSchema = z.object({
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, 'Due date must be in YYYY-MM-DD format')
     .optional(),
+  deadlineTime: z
+    .string()
+    .regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'Deadline time must be in HH:mm format (00:00 to 23:59)')
+    .optional()
+    .nullable(),
+  deadlineAt: z
+    .union([z.string(), z.date()])
+    .optional()
+    .nullable(),
+  deadlineTimezone: z
+    .string()
+    .trim()
+    .optional(),
+  reminderMinutesBefore: z
+    .union([z.literal(30), z.literal(60), z.literal(0), z.null()])
+    .optional(),
   priority: z
     .enum(['normal', 'high'])
     .optional(),
@@ -56,6 +72,22 @@ export const createTaskSchema = z
     due: z
       .string()
       .regex(/^\d{4}-\d{2}-\d{2}$/, 'Due date must be in YYYY-MM-DD format'),
+    deadlineTime: z
+      .string()
+      .regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'Deadline time must be in HH:mm format (00:00 to 23:59)')
+      .optional()
+      .nullable(),
+    deadlineAt: z
+      .union([z.string(), z.date()])
+      .optional()
+      .nullable(),
+    deadlineTimezone: z
+      .string()
+      .trim()
+      .optional(),
+    reminderMinutesBefore: z
+      .union([z.literal(30), z.literal(60), z.literal(0), z.null()])
+      .optional(),
     priority: z
       .enum(['normal', 'high'])
       .default('normal'),
@@ -120,6 +152,22 @@ export const updateTaskSchema = z.object({
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, 'Due date must be in YYYY-MM-DD format')
     .optional(),
+  deadlineTime: z
+    .string()
+    .regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'Deadline time must be in HH:mm format (00:00 to 23:59)')
+    .optional()
+    .nullable(),
+  deadlineAt: z
+    .union([z.string(), z.date()])
+    .optional()
+    .nullable(),
+  deadlineTimezone: z
+    .string()
+    .trim()
+    .optional(),
+  reminderMinutesBefore: z
+    .union([z.literal(30), z.literal(60), z.literal(0), z.null()])
+    .optional(),
   priority: z
     .enum(['normal', 'high'])
     .optional(),
@@ -148,12 +196,20 @@ export const taskQuerySchema = z.object({
   reporting: z.enum(['me']).optional(),
   reportingManager: z.string().optional(),
   due: z.enum(['late', 'today', 'all']).optional(),
+  startDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'startDate must be in YYYY-MM-DD format')
+    .optional(),
+  endDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'endDate must be in YYYY-MM-DD format')
+    .optional(),
+  priority: z.enum(['normal', 'high', 'all']).optional(),
   parentTask: z.string().optional(),
   taskLevel: z.enum(['parent', 'subtask', 'standalone', 'all']).optional(),
   q: z.string().optional(),
   page: z.coerce.number().min(1).default(1),
-  limit: z.coerce.number().min(1).max(100).default(50),
+  limit: z.coerce.number().min(1).max(500).default(50),
 })
 
 export type TaskQueryInput = z.infer<typeof taskQuerySchema>
-

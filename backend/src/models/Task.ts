@@ -16,6 +16,9 @@ export interface ITask extends Document {
   reportingManager?: Types.ObjectId | IUser | null
   createdBy: Types.ObjectId | IUser
   due: string // YYYY-MM-DD
+  deadlineAt?: Date | null
+  deadlineTimezone?: string
+  reminderMinutesBefore?: number | null
   priority: TaskPriority
   status: TaskStatus
   parentTask?: Types.ObjectId | ITask | null
@@ -73,6 +76,20 @@ const taskSchema = new Schema<ITask>(
       type: String,
       required: [true, 'Due date (YYYY-MM-DD) is required'],
       match: [/^\d{4}-\d{2}-\d{2}$/, 'Due date must be in YYYY-MM-DD format'],
+    },
+    deadlineAt: {
+      type: Date,
+      default: null,
+      index: true,
+    },
+    deadlineTimezone: {
+      type: String,
+      default: 'Asia/Kolkata',
+      trim: true,
+    },
+    reminderMinutesBefore: {
+      type: Number,
+      default: null,
     },
     priority: {
       type: String,
@@ -135,6 +152,7 @@ taskSchema.index({ owner: 1, status: 1 })
 taskSchema.index({ reportingManager: 1, status: 1 })
 taskSchema.index({ parentTask: 1, deletedAt: 1, status: 1 })
 taskSchema.index({ taskLevel: 1, deletedAt: 1 })
+taskSchema.index({ status: 1, deadlineAt: 1, deletedAt: 1 })
 
 export const Task: Model<ITask> =
   mongoose.models.Task || mongoose.model<ITask>('Task', taskSchema)

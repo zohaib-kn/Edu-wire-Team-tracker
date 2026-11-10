@@ -10,6 +10,9 @@ export interface SubtaskItem {
   responsibilityLabel?: string | null
   note?: string
   due: string
+  deadlineAt?: string | null
+  deadlineTimezone?: string
+  reminderMinutesBefore?: number | null
   priority: TaskPriority
   status: TaskStatus
   isRequired: boolean
@@ -30,6 +33,9 @@ export interface ParentTaskRef {
   id: string
   title: string
   due: string
+  deadlineAt?: string | null
+  deadlineTimezone?: string
+  reminderMinutesBefore?: number | null
   priority: TaskPriority
   status: TaskStatus
 }
@@ -49,6 +55,9 @@ export interface Task {
   createdBy: string
   createdById?: string
   due: string // YYYY-MM-DD
+  deadlineAt?: string | null
+  deadlineTimezone?: string
+  reminderMinutesBefore?: number | null
   priority: TaskPriority
   status: TaskStatus
   taskLevel?: TaskLevel
@@ -103,6 +112,9 @@ export interface TaskFilterParams {
   reporting?: 'me' | string
   reportingManager?: string
   due?: 'late' | 'today' | 'all'
+  startDate?: string
+  endDate?: string
+  taskLevel?: 'parent' | 'subtask' | 'standalone' | 'all'
   q?: string
   priority?: TaskPriority | 'all'
   page?: number
@@ -123,6 +135,10 @@ export interface SubtaskInputPayload {
   responsibilityLabel?: string
   note?: string
   due?: string
+  deadlineTime?: string | null
+  deadlineAt?: string | null
+  deadlineTimezone?: string
+  reminderMinutesBefore?: number | null
   priority?: TaskPriority
   isRequired?: boolean
 }
@@ -134,6 +150,10 @@ export interface CreateTaskPayload {
   owner?: string
   reportingManager?: string
   due: string // YYYY-MM-DD
+  deadlineTime?: string | null
+  deadlineAt?: string | null
+  deadlineTimezone?: string
+  reminderMinutesBefore?: number | null
   priority: TaskPriority
   note?: string
   responsibilityLabel?: string
@@ -147,6 +167,10 @@ export interface CreateSubtaskPayload {
   responsibilityLabel?: string
   note?: string
   due?: string
+  deadlineTime?: string | null
+  deadlineAt?: string | null
+  deadlineTimezone?: string
+  reminderMinutesBefore?: number | null
   priority?: TaskPriority
   isRequired?: boolean
 }
@@ -157,6 +181,10 @@ export interface UpdateTaskPayload {
   owner?: string
   reportingManager?: string
   due?: string // YYYY-MM-DD
+  deadlineTime?: string | null
+  deadlineAt?: string | null
+  deadlineTimezone?: string
+  reminderMinutesBefore?: number | null
   priority?: TaskPriority
 }
 

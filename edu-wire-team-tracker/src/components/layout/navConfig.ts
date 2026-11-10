@@ -1,5 +1,6 @@
 import {
   LayoutDashboard,
+  Calendar,
   CheckSquare,
   History,
   BarChart3,
@@ -34,6 +35,12 @@ export const NAVIGATION_CONFIG: NavSection[] = [
         label: 'Dashboard',
         path: '/dashboard',
         icon: LayoutDashboard,
+      },
+      {
+        id: 'schedule',
+        label: 'Schedule',
+        path: '/schedule',
+        icon: Calendar,
       },
       {
         id: 'my-tasks',

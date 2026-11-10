@@ -7,6 +7,7 @@ export interface MockJob<T = any> {
   opts: Record<string, any>
   attemptsMade: number
   timestamp: number
+  remove: () => Promise<void>
 }
 
 // Registry to link mock workers to mock queues
@@ -15,6 +16,7 @@ export const mockWorkersRegistry = new Map<string, Array<(job: MockJob) => Promi
 export class MockQueue {
   readonly name: string
   private jobs = new Map<string, MockJob>()
+  private timers = new Map<string, NodeJS.Timeout>()
 
   constructor(name: QueueName | string) {
     this.name = name
@@ -35,19 +37,34 @@ export class MockQueue {
       opts: { ...DEFAULT_JOB_OPTIONS, ...opts },
       attemptsMade: 0,
       timestamp: Date.now(),
+      remove: async () => {
+        const timer = this.timers.get(id)
+        if (timer) {
+          clearTimeout(timer)
+          this.timers.delete(id)
+        }
+        this.jobs.delete(id)
+      },
     }
 
     this.jobs.set(id, job)
 
-    // Trigger registered mock worker if present
-    const workerHandlers = mockWorkersRegistry.get(this.name) || []
-    for (const handler of workerHandlers) {
-      setTimeout(() => {
+    const delay = typeof opts?.delay === 'number' && opts.delay > 0 ? opts.delay : 0
+
+    // Trigger registered mock worker handlers after delay (or immediately on next tick)
+    const timer = setTimeout(() => {
+      this.timers.delete(id)
+      if (!this.jobs.has(id)) return // cancelled or removed
+
+      const workerHandlers = mockWorkersRegistry.get(this.name) || []
+      for (const handler of workerHandlers) {
         handler(job).catch((err) => {
           console.error(`[MOCK_WORKER: ${this.name}] Job ${job.id} handler error:`, err)
         })
-      }, 0)
-    }
+      }
+    }, delay)
+
+    this.timers.set(id, timer)
 
     return job
   }
@@ -56,16 +73,40 @@ export class MockQueue {
     return this.jobs.get(jobId) || null
   }
 
+  /**
+   * For tests: manually executes a queued/delayed job immediately regardless of delay.
+   */
+  async triggerJobNow(jobId: string): Promise<any> {
+    const job = this.jobs.get(jobId)
+    if (!job) return null
+
+    const timer = this.timers.get(jobId)
+    if (timer) {
+      clearTimeout(timer)
+      this.timers.delete(jobId)
+    }
+
+    const workerHandlers = mockWorkersRegistry.get(this.name) || []
+    const results = []
+    for (const handler of workerHandlers) {
+      results.push(await handler(job))
+    }
+    return results[0]
+  }
+
   async drain(): Promise<void> {
+    for (const timer of this.timers.values()) {
+      clearTimeout(timer)
+    }
+    this.timers.clear()
     this.jobs.clear()
   }
 
   async close(): Promise<void> {
-    this.jobs.clear()
+    await this.drain()
   }
 
   on(_event: string, _callback: Function): this {
     return this
   }
 }
-
