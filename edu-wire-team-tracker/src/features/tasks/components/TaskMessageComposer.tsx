@@ -86,18 +86,18 @@ export function TaskMessageComposer({
   ]
 
   return (
-    <div className="border border-border-subtle rounded-inner bg-surface shadow-card overflow-hidden">
+    <div className="border border-border-subtle rounded-[12px] bg-surface shadow-card overflow-hidden">
       {/* Quick type selectors — only shown to admins and leads */}
       {showTypePicker && (
-        <div className="flex items-center gap-1.5 px-3 pt-2.5 pb-1">
-          <span className="text-[11px] text-text-muted font-medium shrink-0">Send as:</span>
+        <div className="flex items-center flex-wrap gap-2 px-4 py-2.5 border-b border-border-subtle/60">
+          <span className="text-xs text-text-muted font-medium shrink-0 mr-0.5">Send as:</span>
           {typeOptions.map(({ type, label, Icon }) => (
             <button
               key={type}
               type="button"
               onClick={() => setTypeAndFocus(type)}
               className={cn(
-                'inline-flex items-center gap-1 px-2 py-1 rounded-badge text-[11px] font-medium border transition-colors',
+                'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[8px] text-[11.5px] font-medium border transition-colors whitespace-nowrap cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue',
                 selectedType === type
                   ? type === 'question'
                     ? 'bg-tint-blue-bg text-brand-blue border-tint-blue-border'
@@ -108,8 +108,8 @@ export function TaskMessageComposer({
               )}
               aria-pressed={selectedType === type}
             >
-              {Icon && <Icon className="w-3 h-3" />}
-              {label}
+              {Icon && <Icon className="w-3.5 h-3.5 shrink-0" />}
+              <span>{label}</span>
             </button>
           ))}
         </div>
@@ -131,18 +131,18 @@ export function TaskMessageComposer({
           }
           aria-label="Discussion message"
           className={cn(
-            'w-full resize-none px-3.5 py-3 text-sm text-text-primary bg-transparent',
-            'placeholder:text-text-muted/60 leading-relaxed',
+            'w-full resize-none px-4 py-3.5 text-[13.5px] text-text-primary bg-transparent',
+            'placeholder:text-text-muted/70 leading-6',
             'focus:outline-none',
             'disabled:opacity-60 disabled:cursor-not-allowed',
-            'min-h-[72px] max-h-[160px]',
+            'min-h-[84px] max-h-[160px]',
           )}
           style={{ overflow: 'hidden' }}
         />
       </div>
 
       {/* Footer: char count + send */}
-      <div className="flex items-center justify-between gap-3 px-3 pb-2.5 pt-1 border-t border-border-subtle/60">
+      <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-t border-border-subtle/60">
         <span
           className={cn(
             'text-[11px] tabular-nums',
@@ -152,7 +152,7 @@ export function TaskMessageComposer({
           {body.length}/{MAX_CHARS}
         </span>
 
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-2.5">
           <span className="text-[11px] text-text-muted hidden sm:inline select-none">
             Shift+Enter for new line
           </span>

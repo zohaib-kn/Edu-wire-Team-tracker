@@ -1,8 +1,9 @@
-import { useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useRef, type MutableRefObject } from 'react'
+import { useLocation, useNavigate, type Location, type NavigateFunction } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { AlarmClock, AlertTriangle, CheckCircle2, MessageSquare, ClipboardList, Eye, X } from 'lucide-react'
 import { useNotifications, useMarkAsRead } from './useNotifications'
+import { getTaskDetailNavState } from '@/features/tasks/utils/taskNavigation'
 import type { AppNotification } from '../types/notification.types'
 
 const STORAGE_KEY = 'edu_seen_notif_ids'
@@ -37,6 +38,12 @@ export function useNotificationToasts() {
   const { data } = useNotifications()
   const { mutate: markAsRead } = useMarkAsRead()
   const navigate = useNavigate()
+  const location = useLocation()
+  const locationRef = useRef<Location>(location)
+
+  useEffect(() => {
+    locationRef.current = location
+  }, [location])
 
   // Track notification IDs that have already been seen/processed
   const seenIdsRef = useRef<Set<string>>(getStoredSeenIds())
@@ -60,7 +67,7 @@ export function useNotificationToasts() {
           // Toast recent notifications even on initial load/refresh (within 3 mins)
           seenIdsRef.current.add(notif.id)
           storeSeenId(notif.id)
-          displayDeadlineAlertToast(notif, navigate, markAsRead)
+          displayDeadlineAlertToast(notif, navigate, locationRef, markAsRead)
         } else {
           // Record older or already-seen notifications as seen without toasting
           seenIdsRef.current.add(notif.id)
@@ -78,7 +85,7 @@ export function useNotificationToasts() {
     newNotifications.forEach((notif) => {
       seenIdsRef.current.add(notif.id)
       storeSeenId(notif.id)
-      displayDeadlineAlertToast(notif, navigate, markAsRead)
+      displayDeadlineAlertToast(notif, navigate, locationRef, markAsRead)
     })
   }, [data, navigate, markAsRead])
 }
@@ -89,7 +96,8 @@ export function useNotificationToasts() {
  */
 function displayDeadlineAlertToast(
   notif: AppNotification,
-  navigate: (path: string) => void,
+  navigate: NavigateFunction,
+  locationRef: MutableRefObject<Location>,
   markAsRead: (id: string) => void,
 ) {
   const isWarning = notif.type === 'deadline_warning'
@@ -130,7 +138,10 @@ function displayDeadlineAlertToast(
           markAsRead(notif.id)
           toast.dismiss(t.id)
           if (notif.taskId) {
-            navigate(isDiscussion ? `/tasks/${notif.taskId}?tab=discussion` : `/tasks/${notif.taskId}`)
+            const target = isDiscussion
+              ? `/tasks/${encodeURIComponent(notif.taskId)}?tab=discussion`
+              : `/tasks/${encodeURIComponent(notif.taskId)}`
+            navigate(target, { state: getTaskDetailNavState(locationRef.current) })
           }
         }}
       >

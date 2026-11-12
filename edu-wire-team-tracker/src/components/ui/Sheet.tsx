@@ -1,4 +1,5 @@
-import { useEffect, type ReactNode } from 'react'
+import { useEffect, useId, useRef, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/utils/cn'
 
@@ -21,28 +22,42 @@ export function Sheet({
   footer,
   className,
 }: SheetProps) {
+  const sheetRef = useRef<HTMLDivElement>(null)
+  const titleId = useId()
+
   useEffect(() => {
+    if (!isOpen) return undefined
+
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
+      if (e.key === 'Escape') {
+        const openDialogs = document.querySelectorAll('[role="dialog"][aria-modal="true"]')
+        if (openDialogs.length > 0 && openDialogs[openDialogs.length - 1] !== sheetRef.current) {
+          return
+        }
+        e.preventDefault()
+        e.stopPropagation()
         onClose()
       }
     }
-    if (isOpen) {
-      document.body.style.overflow = 'hidden'
-      window.addEventListener('keydown', handleKeyDown)
-    }
+
+    window.addEventListener('keydown', handleKeyDown)
     return () => {
-      document.body.style.overflow = ''
+      document.body.style.overflow = previousOverflow
       window.removeEventListener('keydown', handleKeyDown)
     }
   }, [isOpen, onClose])
 
   if (!isOpen) return null
 
-  return (
+  return createPortal(
     <div
+      ref={sheetRef}
       role="dialog"
       aria-modal="true"
+      aria-labelledby={title ? titleId : undefined}
       className="fixed inset-0 z-50 flex justify-end"
     >
       {/* Backdrop */}
@@ -63,7 +78,7 @@ export function Sheet({
         <div className="flex items-center justify-between border-b border-border-subtle px-6 py-5 shrink-0">
           <div>
             {title && (
-              <h2 className="text-base font-semibold text-text-primary tracking-tight">
+              <h2 id={titleId} className="text-base font-semibold text-text-primary tracking-tight">
                 {title}
               </h2>
             )}
@@ -91,6 +106,7 @@ export function Sheet({
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

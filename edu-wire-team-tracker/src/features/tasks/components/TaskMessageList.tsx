@@ -1,8 +1,6 @@
-import { useEffect, useRef } from 'react'
 import { MessageCircle } from 'lucide-react'
 import { Spinner } from '@/components/ui/Spinner'
 import { Button } from '@/components/ui/Button'
-import { EmptyState } from '@/components/ui/EmptyState'
 import { TaskMessageItem } from './TaskMessageItem'
 import type { TaskMessage } from '../types/taskMessage.types'
 
@@ -27,21 +25,10 @@ export function TaskMessageList({
   onLoadEarlier,
   isLoadingEarlier = false,
 }: TaskMessageListProps) {
-  const bottomRef = useRef<HTMLDivElement>(null)
-  const prevLengthRef = useRef(0)
-
-  // Auto-scroll to bottom when new messages arrive
-  useEffect(() => {
-    if (messages.length > prevLengthRef.current) {
-      bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
-    }
-    prevLengthRef.current = messages.length
-  }, [messages.length])
-
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 gap-2 text-text-muted">
-        <Spinner size="md" className="text-brand-blue" />
+      <div className="flex items-center justify-center py-6 gap-2 text-text-muted">
+        <Spinner size="sm" className="text-brand-blue" />
         <p className="text-xs">Loading discussion...</p>
       </div>
     )
@@ -49,26 +36,23 @@ export function TaskMessageList({
 
   if (isError) {
     return (
-      <EmptyState
-        icon={<MessageCircle className="w-5 h-5" />}
-        title="Could not load discussion"
-        description="There was an error loading messages. Please try again."
-        action={
-          <Button variant="outline" size="sm" onClick={onRetry}>
-            Retry
-          </Button>
-        }
-      />
+      <div className="py-5 px-4 text-center rounded-[10px] border border-dashed border-tint-red-border bg-tint-red-bg/40 space-y-2">
+        <p className="text-xs font-medium text-tint-red-text">
+          Could not load discussion.
+        </p>
+        <Button variant="outline" size="sm" onClick={onRetry}>
+          Retry
+        </Button>
+      </div>
     )
   }
 
   if (messages.length === 0) {
     return (
-      <EmptyState
-        icon={<MessageCircle className="w-5 h-5" />}
-        title="No messages yet"
-        description="Start the conversation by asking for an update or leaving an instruction below."
-      />
+      <div className="py-6 px-5 flex items-center justify-center gap-2.5 text-center rounded-[12px] border border-dashed border-border-subtle bg-slate-50/50 text-[13px] leading-5 text-text-muted">
+        <MessageCircle className="w-4 h-4 text-text-muted shrink-0" />
+        <span>No messages yet. Start a conversation.</span>
+      </div>
     )
   }
 
@@ -90,7 +74,7 @@ export function TaskMessageList({
       )}
 
       {/* Message list */}
-      <div className="flex flex-col gap-4 py-1">
+      <div className="flex flex-col gap-3.5 py-0.5">
         {messages.map((msg) => (
           <TaskMessageItem
             key={msg.id}
@@ -99,10 +83,6 @@ export function TaskMessageList({
           />
         ))}
       </div>
-
-      {/* Scroll anchor */}
-      <div ref={bottomRef} aria-hidden="true" />
     </div>
   )
 }
-

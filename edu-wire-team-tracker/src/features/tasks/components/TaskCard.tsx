@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import {
   Calendar,
   User,
@@ -12,6 +12,7 @@ import {
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { TaskStatusSelect } from './TaskStatusSelect'
 import { TaskPriorityBadge } from './TaskPriorityBadge'
+import { TaskFolderExplorer } from './TaskFolderExplorer'
 import { Folder, type FolderEntry } from '@/components/ui/Folder'
 import {
   formatDateOnly,
@@ -20,6 +21,7 @@ import {
   isTaskDueToday,
 } from '../utils/dateUtils'
 import { canPerformTaskAction } from '../utils/taskPermissions'
+import { getTaskDetailNavState } from '../utils/taskNavigation'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { cn } from '@/lib/utils/cn'
 import type { Task } from '../types/task.types'
@@ -33,8 +35,13 @@ export interface TaskCardProps {
 export function TaskCard({ task, onEdit, onDelete }: TaskCardProps) {
   const { user } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const [menuOpen, setMenuOpen] = useState(false)
+  const [isExplorerOpen, setIsExplorerOpen] = useState(false)
+  const [containerWidth, setContainerWidth] = useState(0)
   const menuRef = useRef<HTMLDivElement>(null)
+  const projectContainerRef = useRef<HTMLDivElement>(null)
+  const folderTriggerRef = useRef<HTMLDivElement>(null)
 
   const canEdit = canPerformTaskAction(user, 'edit', task)
   const canDelete = canPerformTaskAction(user, 'delete', task)
@@ -44,127 +51,107 @@ export function TaskCard({ task, onEdit, onDelete }: TaskCardProps) {
 
   const hasSubtasks =
     task.taskLevel === 'parent' && Boolean(task.subtasks && task.subtasks.length > 0)
-  const subtasks = task.subtasks || []
+  const subtasks = useMemo(() => task.subtasks || [], [task.subtasks])
+
+  const totalSubtasksCount = task.progress?.totalSubtasks ?? subtasks.length
+  const completedSubtasksCount = useMemo(
+    () =>
+      task.progress?.completedSubtasks ??
+      subtasks.filter((sub) => sub.status === 'done').length,
+    [task.progress?.completedSubtasks, subtasks],
+  )
+  const progressPercentage =
+    task.progress?.progressPercentage ??
+    (totalSubtasksCount > 0
+      ? Math.round((completedSubtasksCount / totalSubtasksCount) * 100)
+      : 0)
 
   const parentTitle =
     task.parentTask && typeof task.parentTask === 'object' && 'title' in task.parentTask
-      ? (task.parentTask as any).title
+      ? task.parentTask.title
       : null
 
-  // Memoize Folder entries for multi-assignee Parent Task
-  const folderItems = useMemo<FolderEntry[]>(() => {
+  // Measure parent column width so folder preview always fits inside its column
+  useEffect(() => {
+    if (!hasSubtasks) return undefined
+    const node = projectContainerRef.current
+    if (!node) return undefined
+
+    const updateWidth = () => {
+      setContainerWidth(node.clientWidth)
+    }
+    updateWidth()
+
+    if (typeof ResizeObserver === 'undefined') return undefined
+    const observer = new ResizeObserver(updateWidth)
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [hasSubtasks])
+
+  const folderScale =
+    containerWidth > 0
+      ? Math.min(1.02, Math.max(0.72, (containerWidth - 36) / 224))
+      : 0.96
+
+  // Limit decorative previews inside the folder pocket to 2–3 minimal sheets
+  const folderPreviewItems = useMemo<FolderEntry[]>(() => {
     if (!subtasks || subtasks.length === 0) return []
 
-    return subtasks.map((sub) => {
+    return subtasks.slice(0, 3).map((sub) => {
       const isDone = sub.status === 'done'
       const isDoing = sub.status === 'doing'
 
       return {
         id: sub.id,
         title: sub.title,
-        description: `${sub.owner}${sub.responsibilityLabel ? ` • ${sub.responsibilityLabel}` : ''}`,
         content: (
           <div className="box-border flex h-full flex-col justify-between p-2.5 select-none text-left bg-white rounded-[7px]">
             <div className="min-w-0 space-y-1.5">
-              {/* Row 1: Minimalist Status (no background box, single line) */}
-              <div className="flex items-center justify-between gap-1">
+              <div className="flex items-center gap-1">
                 <span
                   className={cn(
-                    'inline-flex items-center gap-1 text-[9px] font-semibold tracking-tight whitespace-nowrap',
+                    'w-1.5 h-1.5 rounded-full shrink-0',
                     isDone
-                      ? 'text-emerald-600'
+                      ? 'bg-emerald-500'
                       : isDoing
-                        ? 'text-amber-600'
+                        ? 'bg-amber-500'
+                        : 'bg-brand-blue',
+                  )}
+                />
+                <span
+                  className={cn(
+                    'text-[8.5px] font-semibold tracking-tight whitespace-nowrap',
+                    isDone
+                      ? 'text-emerald-700'
+                      : isDoing
+                        ? 'text-amber-700'
                         : 'text-slate-600',
                   )}
                 >
-                  <span
-                    className={cn(
-                      'w-1.5 h-1.5 rounded-full shrink-0',
-                      isDone
-                        ? 'bg-emerald-500'
-                        : isDoing
-                          ? 'bg-amber-500'
-                          : 'bg-brand-blue',
-                    )}
-                  />
-                  <span>{isDone ? 'Done' : isDoing ? 'Doing' : 'To Do'}</span>
+                  {isDone ? 'Done' : isDoing ? 'In Progress' : 'To Do'}
                 </span>
               </div>
 
-              {/* Row 2: Subtask Title */}
-              <h5
+              <p
                 className={cn(
-                  'text-[11px] font-bold leading-[1.25] line-clamp-2 text-slate-900',
+                  'text-[10px] font-semibold leading-tight line-clamp-2 text-slate-800',
                   isDone && 'line-through text-slate-400',
                 )}
-                title={sub.title}
               >
                 {sub.title}
-              </h5>
-
-              {/* Row 3: Assignee & Role/Label */}
-              <div className="space-y-1 min-w-0">
-                <div className="flex items-center gap-1 text-[9.5px] text-slate-500 font-medium min-w-0">
-                  <User className="w-2.5 h-2.5 shrink-0 text-slate-400" />
-                  <span className="truncate">{sub.owner}</span>
-                </div>
-
-                {sub.responsibilityLabel && (
-                  <div className="min-w-0">
-                    <span className="inline-block max-w-full truncate text-[8.5px] font-medium px-1.5 py-0.5 bg-slate-50 text-slate-600 rounded border border-slate-200/80">
-                      {sub.responsibilityLabel}
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              {/* Row 4: Clean Deadline / Due Date */}
-              {(sub.deadlineAt || sub.due) && (
-                <div className="flex items-center gap-1 text-[8px] leading-tight min-w-0">
-                  {sub.deadlineAt ? (
-                    <Clock className="w-2.5 h-2.5 shrink-0 text-brand-blue" />
-                  ) : (
-                    <Calendar className="w-2.5 h-2.5 shrink-0 text-slate-400" />
-                  )}
-                  <span
-                    className={cn(
-                      'truncate font-medium',
-                      sub.deadlineAt ? 'text-brand-blue' : 'text-slate-500',
-                    )}
-                    title={
-                      sub.deadlineAt
-                        ? formatDeadline(sub.deadlineAt, sub.deadlineTimezone || 'Asia/Kolkata', sub.due)
-                        : formatDateOnly(sub.due)
-                    }
-                  >
-                    {sub.deadlineAt
-                      ? formatDeadline(sub.deadlineAt, sub.deadlineTimezone || 'Asia/Kolkata', sub.due)
-                      : formatDateOnly(sub.due)}
-                  </span>
-                </div>
-              )}
+              </p>
             </div>
 
-            {/* Bottom Row: Minimalistic Action Button (no blue bg, clearly visible) */}
-            <button
-              type="button"
-              onPointerDown={(e) => e.stopPropagation()}
-              onClick={(e) => {
-                e.stopPropagation()
-                navigate(`/tasks/${encodeURIComponent(sub.id)}`)
-              }}
-              className="w-full py-1 px-2 mt-1.5 rounded-md bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-950 border border-slate-200 hover:border-slate-300 text-[9px] font-medium flex items-center justify-center gap-1 transition-colors cursor-pointer active:scale-[0.98] shrink-0"
-              title="Open Task Details"
-            >
-              <span>View Task</span>
-              <ArrowUpRight className="w-2.5 h-2.5 text-slate-500 shrink-0" />
-            </button>
+            {/* Minimal neutral preview bars (no unreadable micro-controls) */}
+            <div className="space-y-1.5 pt-2">
+              <div className="h-1 w-4/5 rounded-full bg-slate-200/80" />
+              <div className="h-1 w-3/5 rounded-full bg-slate-200/60" />
+            </div>
           </div>
         ),
       }
     })
-  }, [subtasks, navigate])
+  }, [subtasks])
 
   // Close card actions dropdown when clicking outside
   useEffect(() => {
@@ -178,51 +165,220 @@ export function TaskCard({ task, onEdit, onDelete }: TaskCardProps) {
   }, [])
 
   const handleCardClick = () => {
-    navigate(`/tasks/${encodeURIComponent(task.id)}`)
+    navigate(`/tasks/${encodeURIComponent(task.id)}`, {
+      state: getTaskDetailNavState(location),
+    })
   }
 
-  // Pure 3D Animated Folder for Multi-Assignee Parent Tasks (No outer card container)
+  const handleCardKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.target !== e.currentTarget) return
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      handleCardClick()
+    }
+  }
+
+  // Compact 3D Folder Preview + Right-Side Drawer for Grouped Parent Projects
   if (hasSubtasks) {
+    const folderColor =
+      task.status === 'done'
+        ? '#10B981'
+        : task.status === 'doing'
+          ? '#D97706'
+          : '#2563EB'
+
     return (
-      <div
-        className="relative flex items-center justify-center py-6 px-1 my-2 overflow-visible select-none cursor-pointer"
-        onClick={(e) => e.stopPropagation()}
-        onDoubleClick={() => navigate(`/tasks/${encodeURIComponent(task.id)}`)}
-        title="Click folder to open subtasks (Double-click to open parent details)"
-      >
-        <Folder
-          label={task.title}
-          mode="flap"
-          variant="solid"
-          layout="spread"
-          color={
-            task.status === 'done'
-              ? '#10B981'
-              : task.status === 'doing'
-                ? '#3B82F6'
-                : '#2563EB'
-          }
-          paperColor="#FFFFFF"
-          tabPosition="right"
-          openOn="click"
-          size={1.15}
-          bounce={0.4}
-          peek={true}
-          zoomOnClick={true}
-          draggable={false}
-          theme="light"
-          items={folderItems}
+      <>
+        <div
+          ref={projectContainerRef}
+          className={cn(
+            'group relative flex flex-col min-w-0 rounded-inner bg-surface border p-3.5 sm:p-4 shadow-card transition-all duration-150',
+            'hover:shadow-card-hover hover:border-slate-300',
+            overdue
+              ? 'border-tint-red-border/90 bg-tint-red-bg/10'
+              : task.status === 'done'
+                ? 'border-tint-green-border/80 bg-tint-green-bg/10'
+                : 'border-border-subtle',
+          )}
+        >
+          {/* Compact Folder Preview centered inside column bounds */}
+          <div className="flex items-center justify-center pt-3 pb-4 w-full min-w-0 overflow-visible">
+            <Folder
+              label={task.title}
+              mode="flap"
+              variant="solid"
+              layout="spread"
+              color={folderColor}
+              paperColor="#FFFFFF"
+              tabPosition="right"
+              openOn="none"
+              previewOnly={true}
+              maxPreviewItems={3}
+              size={folderScale}
+              bounce={0.35}
+              peek={true}
+              intro={false}
+              tilt={0.35}
+              zoomOnClick={false}
+              draggable={false}
+              theme="light"
+              triggerRef={folderTriggerRef}
+              ariaLabel={`Open ${task.title} project tasks (${totalSubtasksCount} tasks, ${completedSubtasksCount} completed)`}
+              onFolderClick={() => setIsExplorerOpen(true)}
+              items={folderPreviewItems}
+            />
+          </div>
+
+          {/* Project Title, Progress & Actions */}
+          <div className="pt-2.5 border-t border-border-subtle/70 space-y-2 min-w-0">
+            <div className="flex items-start justify-between gap-2">
+              <button
+                type="button"
+                onClick={() => setIsExplorerOpen(true)}
+                className="min-w-0 flex-1 text-left group/title focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue rounded cursor-pointer"
+              >
+                <h4 className="text-sm font-semibold text-text-primary leading-snug line-clamp-2 group-hover/title:text-brand-blue transition-colors">
+                  {task.title}
+                </h4>
+              </button>
+
+              <div className="flex items-center gap-1 shrink-0">
+                {task.priority === 'high' && <TaskPriorityBadge priority="high" />}
+
+                <div className="relative" ref={menuRef}>
+                  <button
+                    type="button"
+                    onClick={() => setMenuOpen((prev) => !prev)}
+                    aria-label={`Project options for ${task.title}`}
+                    aria-expanded={menuOpen}
+                    className="p-1 rounded-badge text-text-muted hover:text-text-primary hover:bg-slate-100 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue cursor-pointer"
+                  >
+                    <MoreVertical className="w-4 h-4" />
+                  </button>
+
+                  {menuOpen && (
+                    <div
+                      role="menu"
+                      className="absolute right-0 mt-1 w-40 rounded-card bg-surface border border-border-subtle shadow-dropdown py-1 z-30 text-xs focus:outline-none animate-in fade-in zoom-in-95 duration-100"
+                    >
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          setMenuOpen(false)
+                          setIsExplorerOpen(true)
+                        }}
+                        className="w-full flex items-center gap-2 px-3 py-1.5 text-left text-text-primary hover:bg-slate-50 cursor-pointer"
+                      >
+                        <ArrowUpRight className="w-3.5 h-3.5 text-text-muted" />
+                        <span>Open Tasks ({totalSubtasksCount})</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          setMenuOpen(false)
+                          navigate(`/tasks/${encodeURIComponent(task.id)}`, {
+                            state: getTaskDetailNavState(location),
+                          })
+                        }}
+                        className="w-full flex items-center gap-2 px-3 py-1.5 text-left text-text-primary hover:bg-slate-50 cursor-pointer"
+                      >
+                        <ArrowUpRight className="w-3.5 h-3.5 text-text-muted" />
+                        <span>Project Details</span>
+                      </button>
+
+                      {canEdit && onEdit && (
+                        <button
+                          type="button"
+                          role="menuitem"
+                          onClick={() => {
+                            setMenuOpen(false)
+                            onEdit(task)
+                          }}
+                          className="w-full flex items-center gap-2 px-3 py-1.5 text-left text-text-primary hover:bg-slate-50 cursor-pointer"
+                        >
+                          <Edit2 className="w-3.5 h-3.5 text-text-muted" />
+                          <span>Edit Project</span>
+                        </button>
+                      )}
+
+                      {canDelete && onDelete && (
+                        <button
+                          type="button"
+                          role="menuitem"
+                          onClick={() => {
+                            setMenuOpen(false)
+                            onDelete(task)
+                          }}
+                          className="w-full flex items-center gap-2 px-3 py-1.5 text-left text-destructive hover:bg-tint-red-bg cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                          <span>Delete</span>
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between gap-2 text-xs text-text-muted">
+              <span className="truncate">
+                <span className="font-semibold text-text-primary">{totalSubtasksCount}</span>{' '}
+                {totalSubtasksCount === 1 ? 'Task' : 'Tasks'} ·{' '}
+                <span className="font-semibold text-text-primary">{completedSubtasksCount}</span>{' '}
+                Completed
+              </span>
+              <span className="font-semibold text-text-primary shrink-0">
+                {progressPercentage}%
+              </span>
+            </div>
+
+            <div
+              className="w-full h-1.5 rounded-full bg-slate-100 overflow-hidden"
+              role="progressbar"
+              aria-valuenow={progressPercentage}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label={`${task.title} completion ${progressPercentage}%`}
+            >
+              <div
+                className={cn(
+                  'h-full rounded-full transition-all duration-300',
+                  progressPercentage === 100
+                    ? 'bg-[#15803D]'
+                    : task.status === 'doing'
+                      ? 'bg-amber-500'
+                      : 'bg-brand-blue',
+                )}
+                style={{ width: `${Math.min(100, Math.max(0, progressPercentage))}%` }}
+              />
+            </div>
+          </div>
+        </div>
+
+        <TaskFolderExplorer
+          isOpen={isExplorerOpen}
+          onClose={() => setIsExplorerOpen(false)}
+          projectTask={task}
+          triggerRef={folderTriggerRef}
         />
-      </div>
+      </>
     )
   }
 
   return (
     <div
+      role="button"
+      tabIndex={0}
+      aria-label={`Open task ${task.title}`}
       onClick={handleCardClick}
+      onKeyDown={handleCardKeyDown}
       className={cn(
-        'group relative flex flex-col justify-between rounded-inner bg-surface border p-3.5 sm:p-4 transition-all duration-150 cursor-pointer shadow-card',
-        'hover:shadow-card-hover hover:border-slate-300',
+        'group relative flex flex-col justify-between min-w-0 rounded-inner bg-surface border p-3.5 sm:p-4 transition-all duration-150 cursor-pointer shadow-card',
+        'hover:shadow-card-hover hover:border-slate-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue',
         overdue
           ? 'border-tint-red-border/90 bg-tint-red-bg/15'
           : task.status === 'done'
@@ -268,7 +424,9 @@ export function TaskCard({ task, onEdit, onDelete }: TaskCardProps) {
                       type="button"
                       onClick={() => {
                         setMenuOpen(false)
-                        navigate(`/tasks/${encodeURIComponent(task.id)}`)
+                        navigate(`/tasks/${encodeURIComponent(task.id)}`, {
+                          state: getTaskDetailNavState(location),
+                        })
                       }}
                       className="w-full flex items-center gap-2 px-3 py-1.5 text-left text-text-primary hover:bg-slate-50 cursor-pointer"
                     >

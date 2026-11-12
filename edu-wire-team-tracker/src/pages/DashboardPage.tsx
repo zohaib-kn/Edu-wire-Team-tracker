@@ -217,7 +217,7 @@ export function DashboardPage() {
           </h2>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           {/* Grouped Projects vs All Tasks Flat Switcher (Only visible to Managers / Super Admin / Team Lead) */}
           {!isMember && (
             <div className="flex items-center bg-slate-100 p-0.5 rounded-full border border-border-subtle text-xs">
@@ -279,109 +279,111 @@ export function DashboardPage() {
           </Button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
-          {/* Column 1: To Do */}
-          <div className="rounded-card bg-tint-blue-bg/35 border border-tint-blue-border/70 p-4 sm:p-4.5 flex flex-col min-h-[460px]">
-            {/* Column Header */}
-            <div className="flex items-center justify-between pb-3.5 mb-3.5 border-b border-tint-blue-border/60">
-              <div className="flex items-center gap-2">
-                <Circle className="w-4 h-4 text-brand-blue" strokeWidth={2} />
-                <h3 className="font-bold text-sm text-text-primary tracking-tight">
-                  To Do
-                </h3>
-              </div>
-              <span className="w-7 h-7 rounded-full bg-surface text-brand-blue font-bold text-xs flex items-center justify-center border border-tint-blue-border shadow-xs">
-                {todoTasks.length}
-              </span>
-            </div>
-
-            {/* Column Cards */}
-            <div className="flex flex-col gap-3 flex-1">
-              {todoTasks.length === 0 ? (
-                <div className="flex-1 flex flex-col items-center justify-center p-8 text-center rounded-inner border border-dashed border-tint-blue-border/70 bg-surface/40">
-                  <Inbox className="w-6 h-6 text-text-muted/60 mb-2" strokeWidth={1.5} />
-                  <p className="text-xs font-semibold text-text-muted">No tasks to do</p>
+        <div className="overflow-x-auto xl:overflow-visible pb-1 -mx-1 px-1">
+          <div className="grid grid-cols-1 md:grid-cols-[repeat(3,minmax(270px,1fr))] gap-5 items-start">
+            {/* Column 1: To Do */}
+            <div className="min-w-0 rounded-card bg-tint-blue-bg/35 border border-tint-blue-border/70 p-4 sm:p-4.5 flex flex-col min-h-[460px]">
+              {/* Column Header */}
+              <div className="flex items-center justify-between pb-3.5 mb-3.5 border-b border-tint-blue-border/60">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Circle className="w-4 h-4 text-brand-blue shrink-0" strokeWidth={2} />
+                  <h3 className="font-bold text-sm text-text-primary tracking-tight truncate">
+                    To Do
+                  </h3>
                 </div>
-              ) : (
-                todoTasks.map((task) => (
-                  <TaskCard
-                    key={task.id}
-                    task={task}
-                    onEdit={handleOpenEdit}
-                    onDelete={(t) => setTaskToDelete(t)}
-                  />
-                ))
-              )}
-            </div>
-          </div>
-
-          {/* Column 2: In Progress */}
-          <div className="rounded-card bg-tint-amber-bg/35 border border-tint-amber-border/70 p-4 sm:p-4.5 flex flex-col min-h-[460px]">
-            {/* Column Header */}
-            <div className="flex items-center justify-between pb-3.5 mb-3.5 border-b border-tint-amber-border/60">
-              <div className="flex items-center gap-2">
-                <Hourglass className="w-4 h-4 text-amber-600" strokeWidth={2} />
-                <h3 className="font-bold text-sm text-text-primary tracking-tight">
-                  In Progress
-                </h3>
+                <span className="w-7 h-7 rounded-full bg-surface text-brand-blue font-bold text-xs flex items-center justify-center border border-tint-blue-border shadow-xs shrink-0">
+                  {todoTasks.length}
+                </span>
               </div>
-              <span className="w-7 h-7 rounded-full bg-surface text-amber-700 font-bold text-xs flex items-center justify-center border border-tint-amber-border shadow-xs">
-                {inProgressTasks.length}
-              </span>
-            </div>
 
-            {/* Column Cards */}
-            <div className="flex flex-col gap-3 flex-1">
-              {inProgressTasks.length === 0 ? (
-                <div className="flex-1 flex flex-col items-center justify-center p-8 text-center rounded-inner border border-dashed border-tint-amber-border/70 bg-surface/40">
-                  <Inbox className="w-6 h-6 text-text-muted/60 mb-2" strokeWidth={1.5} />
-                  <p className="text-xs font-semibold text-text-muted">No tasks in progress</p>
-                </div>
-              ) : (
-                inProgressTasks.map((task) => (
-                  <TaskCard
-                    key={task.id}
-                    task={task}
-                    onEdit={handleOpenEdit}
-                    onDelete={(t) => setTaskToDelete(t)}
-                  />
-                ))
-              )}
-            </div>
-          </div>
-
-          {/* Column 3: Completed */}
-          <div className="rounded-card bg-tint-green-bg/35 border border-tint-green-border/70 p-4 sm:p-4.5 flex flex-col min-h-[460px]">
-            {/* Column Header */}
-            <div className="flex items-center justify-between pb-3.5 mb-3.5 border-b border-tint-green-border/60">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-[#15803D]" strokeWidth={2} />
-                <h3 className="font-bold text-sm text-text-primary tracking-tight">
-                  Completed
-                </h3>
+              {/* Column Cards */}
+              <div className="flex flex-col gap-3 flex-1 min-w-0">
+                {todoTasks.length === 0 ? (
+                  <div className="flex-1 flex flex-col items-center justify-center p-8 text-center rounded-inner border border-dashed border-tint-blue-border/70 bg-surface/40">
+                    <Inbox className="w-6 h-6 text-text-muted/60 mb-2" strokeWidth={1.5} />
+                    <p className="text-xs font-semibold text-text-muted">No tasks to do</p>
+                  </div>
+                ) : (
+                  todoTasks.map((task) => (
+                    <TaskCard
+                      key={task.id}
+                      task={task}
+                      onEdit={handleOpenEdit}
+                      onDelete={(t) => setTaskToDelete(t)}
+                    />
+                  ))
+                )}
               </div>
-              <span className="w-7 h-7 rounded-full bg-surface text-green-700 font-bold text-xs flex items-center justify-center border border-tint-green-border shadow-xs">
-                {completedTasks.length}
-              </span>
             </div>
 
-            {/* Column Cards */}
-            <div className="flex flex-col gap-3 flex-1">
-              {completedTasks.length === 0 ? (
-                <div className="flex-1 flex flex-col items-center justify-center p-8 text-center rounded-inner border border-dashed border-tint-green-border/70 bg-surface/40">
-                  <Inbox className="w-6 h-6 text-text-muted/60 mb-2" strokeWidth={1.5} />
-                  <p className="text-xs font-semibold text-text-muted">No completed tasks</p>
+            {/* Column 2: In Progress */}
+            <div className="min-w-0 rounded-card bg-tint-amber-bg/35 border border-tint-amber-border/70 p-4 sm:p-4.5 flex flex-col min-h-[460px]">
+              {/* Column Header */}
+              <div className="flex items-center justify-between pb-3.5 mb-3.5 border-b border-tint-amber-border/60">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Hourglass className="w-4 h-4 text-amber-600 shrink-0" strokeWidth={2} />
+                  <h3 className="font-bold text-sm text-text-primary tracking-tight truncate">
+                    In Progress
+                  </h3>
                 </div>
-              ) : (
-                completedTasks.map((task) => (
-                  <TaskCard
-                    key={task.id}
-                    task={task}
-                    onEdit={handleOpenEdit}
-                    onDelete={(t) => setTaskToDelete(t)}
-                  />
-                ))
-              )}
+                <span className="w-7 h-7 rounded-full bg-surface text-amber-700 font-bold text-xs flex items-center justify-center border border-tint-amber-border shadow-xs shrink-0">
+                  {inProgressTasks.length}
+                </span>
+              </div>
+
+              {/* Column Cards */}
+              <div className="flex flex-col gap-3 flex-1 min-w-0">
+                {inProgressTasks.length === 0 ? (
+                  <div className="flex-1 flex flex-col items-center justify-center p-8 text-center rounded-inner border border-dashed border-tint-amber-border/70 bg-surface/40">
+                    <Inbox className="w-6 h-6 text-text-muted/60 mb-2" strokeWidth={1.5} />
+                    <p className="text-xs font-semibold text-text-muted">No tasks in progress</p>
+                  </div>
+                ) : (
+                  inProgressTasks.map((task) => (
+                    <TaskCard
+                      key={task.id}
+                      task={task}
+                      onEdit={handleOpenEdit}
+                      onDelete={(t) => setTaskToDelete(t)}
+                    />
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Column 3: Completed */}
+            <div className="min-w-0 rounded-card bg-tint-green-bg/35 border border-tint-green-border/70 p-4 sm:p-4.5 flex flex-col min-h-[460px]">
+              {/* Column Header */}
+              <div className="flex items-center justify-between pb-3.5 mb-3.5 border-b border-tint-green-border/60">
+                <div className="flex items-center gap-2 min-w-0">
+                  <CheckCircle2 className="w-4 h-4 text-[#15803D] shrink-0" strokeWidth={2} />
+                  <h3 className="font-bold text-sm text-text-primary tracking-tight truncate">
+                    Completed
+                  </h3>
+                </div>
+                <span className="w-7 h-7 rounded-full bg-surface text-green-700 font-bold text-xs flex items-center justify-center border border-tint-green-border shadow-xs shrink-0">
+                  {completedTasks.length}
+                </span>
+              </div>
+
+              {/* Column Cards */}
+              <div className="flex flex-col gap-3 flex-1 min-w-0">
+                {completedTasks.length === 0 ? (
+                  <div className="flex-1 flex flex-col items-center justify-center p-8 text-center rounded-inner border border-dashed border-tint-green-border/70 bg-surface/40">
+                    <Inbox className="w-6 h-6 text-text-muted/60 mb-2" strokeWidth={1.5} />
+                    <p className="text-xs font-semibold text-text-muted">No completed tasks</p>
+                  </div>
+                ) : (
+                  completedTasks.map((task) => (
+                    <TaskCard
+                      key={task.id}
+                      task={task}
+                      onEdit={handleOpenEdit}
+                      onDelete={(t) => setTaskToDelete(t)}
+                    />
+                  ))
+                )}
+              </div>
             </div>
           </div>
         </div>

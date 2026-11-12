@@ -41,15 +41,15 @@ function UserFormSheetInner({
   // Allowed roles depending on administrator status
   const roleOptions = isBranchAdmin
     ? [
-        { value: 'Team Lead', label: 'Team Lead' },
-        { value: 'Member', label: 'Member' },
-      ]
+      { value: 'Team Lead', label: 'Team Lead' },
+      { value: 'Member', label: 'Member' },
+    ]
     : [
-        { value: 'Super Admin', label: 'Super Admin' },
-        { value: 'Branch Admin', label: 'Branch Admin' },
-        { value: 'Team Lead', label: 'Team Lead' },
-        { value: 'Member', label: 'Member' },
-      ]
+      { value: 'Super Admin', label: 'Super Admin' },
+      { value: 'Branch Admin', label: 'Branch Admin' },
+      { value: 'Team Lead', label: 'Team Lead' },
+      { value: 'Member', label: 'Member' },
+    ]
 
   // Default values
   const defaultBranch = userToEdit?.branch || (isBranchAdmin ? currentAuthUser?.branchId || '' : branches[0]?.id || '')
@@ -267,8 +267,8 @@ function UserFormSheetInner({
                 isSelf
                   ? 'Self-role modification is disabled.'
                   : isBranchAdmin
-                  ? 'Branch Admins can only assign Team Lead and Member roles.'
-                  : undefined
+                    ? 'Branch Admins can only assign Team Lead and Member roles.'
+                    : undefined
               }
             >
               {roleOptions.map((opt) => (

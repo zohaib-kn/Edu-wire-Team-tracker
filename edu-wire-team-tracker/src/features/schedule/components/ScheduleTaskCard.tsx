@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import {
   Clock,
   Calendar,
@@ -15,6 +15,7 @@ import {
 } from '@/features/tasks/utils/dateUtils'
 import { TaskStatusSelect } from '@/features/tasks/components/TaskStatusSelect'
 import { TaskPriorityBadge } from '@/features/tasks/components/TaskPriorityBadge'
+import { getTaskDetailNavState } from '@/features/tasks/utils/taskNavigation'
 import type { Task } from '@/features/tasks/types/task.types'
 
 export interface ScheduleTaskCardProps {
@@ -31,6 +32,7 @@ export function ScheduleTaskCard({
   className,
 }: ScheduleTaskCardProps) {
   const navigate = useNavigate()
+  const location = useLocation()
 
   const isOverdue = isTaskOverdue(task.due, task.status, task.deadlineAt)
   const isDone = task.status === 'done'
@@ -48,23 +50,43 @@ export function ScheduleTaskCard({
       : null
 
   const handleCardClick = () => {
-    navigate(`/tasks/${encodeURIComponent(task.id)}`)
+    navigate(`/tasks/${encodeURIComponent(task.id)}`, {
+      state: getTaskDetailNavState(location),
+    })
+  }
+
+  const handleCardKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.target !== e.currentTarget) return
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      handleCardClick()
+    }
   }
 
   if (compact) {
     return (
       <div
-        onClick={handleCardClick}
+        role="button"
+        tabIndex={0}
+        aria-label={`Open task ${task.title}`}
+        onClick={(e) => {
+          e.stopPropagation()
+          handleCardClick()
+        }}
+        onKeyDown={(e) => {
+          e.stopPropagation()
+          handleCardKeyDown(e)
+        }}
         className={cn(
           'group px-2.5 py-1.5 rounded-lg border text-xs transition-all cursor-pointer select-none',
-          'hover:shadow-sm hover:border-slate-300',
+          'hover:shadow-sm hover:border-slate-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue',
           isDone
             ? 'bg-emerald-50/50 border-emerald-200/80 text-emerald-900'
             : isOverdue
-            ? 'bg-rose-50/60 border-rose-200 text-rose-900'
-            : isDoing
-            ? 'bg-amber-50/50 border-amber-200 text-amber-900'
-            : 'bg-white border-slate-200 text-slate-800',
+              ? 'bg-rose-50/60 border-rose-200 text-rose-900'
+              : isDoing
+                ? 'bg-amber-50/50 border-amber-200 text-amber-900'
+                : 'bg-white border-slate-200 text-slate-800',
           className,
         )}
       >
@@ -92,17 +114,21 @@ export function ScheduleTaskCard({
 
   return (
     <div
+      role="button"
+      tabIndex={0}
+      aria-label={`Open task ${task.title}`}
       onClick={handleCardClick}
+      onKeyDown={handleCardKeyDown}
       className={cn(
         'group p-3 rounded-xl border transition-all cursor-pointer select-none shadow-xs',
-        'hover:shadow-md hover:border-slate-300',
+        'hover:shadow-md hover:border-slate-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue',
         isDone
           ? 'bg-emerald-50/30 border-emerald-200/90 text-slate-700'
           : isOverdue
-          ? 'bg-rose-50/40 border-rose-200 text-rose-950'
-          : isDoing
-          ? 'bg-amber-50/30 border-amber-200 text-amber-950'
-          : 'bg-white border-slate-200 text-slate-900',
+            ? 'bg-rose-50/40 border-rose-200 text-rose-950'
+            : isDoing
+              ? 'bg-amber-50/30 border-amber-200 text-amber-950'
+              : 'bg-white border-slate-200 text-slate-900',
         className,
       )}
     >

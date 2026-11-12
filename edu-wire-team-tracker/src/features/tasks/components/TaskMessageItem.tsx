@@ -1,4 +1,5 @@
 import { cn } from '@/lib/utils/cn'
+import { SafeFormattedText } from './SafeFormattedText'
 import type { TaskMessage } from '../types/taskMessage.types'
 
 // ─── timestamp formatter ─────────────────────────────────────────────────────
@@ -61,17 +62,12 @@ export function TaskMessageItem({ message, isMine }: TaskMessageItemProps) {
   const typeLabel = getTypeLabel(message.type)
 
   return (
-    <div
-      className={cn(
-        'flex items-start gap-2.5',
-        isMine ? 'flex-row-reverse' : 'flex-row',
-      )}
-    >
-      {/* Avatar / Initials */}
+    <div className="flex items-start gap-2.5 min-w-0">
+      {/* Minimal initials indicator (no photos) */}
       <div
         aria-hidden="true"
         className={cn(
-          'shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold select-none',
+          'shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold select-none mt-0.5',
           avatarColour,
         )}
         title={`${message.sender.name} (${message.sender.role})`}
@@ -79,61 +75,54 @@ export function TaskMessageItem({ message, isMine }: TaskMessageItemProps) {
         {initials}
       </div>
 
-      {/* Message bubble */}
-      <div
-        className={cn(
-          'max-w-[82%] sm:max-w-[75%] flex flex-col gap-1',
-          isMine ? 'items-end' : 'items-start',
-        )}
-      >
-        {/* Sender line */}
-        <div
-          className={cn(
-            'flex items-center gap-1.5 text-[11px]',
-            isMine ? 'flex-row-reverse' : 'flex-row',
-          )}
-        >
+      {/* Comment content */}
+      <div className="flex-1 min-w-0 space-y-1.5">
+        {/* Header: Sender name, role/context, type tag, and clear timestamp */}
+        <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs">
           <span className="font-semibold text-text-primary">
-            {isMine ? 'You' : message.sender.name}
+            {message.sender.name}
+            {isMine && (
+              <span className="ml-1 text-[11px] font-normal text-text-muted">(You)</span>
+            )}
           </span>
-          {!isMine && (
-            <span className="text-text-muted">· {message.sender.role}</span>
+
+          {!isMine && message.sender.role && (
+            <span className="text-[11px] text-text-muted">· {message.sender.role}</span>
           )}
+
           {typeLabel && (
             <span
               className={cn(
-                'inline-flex items-center px-1.5 py-0.5 rounded-badge text-[10px] font-semibold border',
+                'inline-flex items-center px-1.5 py-0.5 rounded-[6px] text-[10px] font-semibold border',
                 getTypeBadgeClass(message.type),
               )}
             >
               {typeLabel}
             </span>
           )}
+
+          <time
+            dateTime={message.createdAt}
+            className="text-[11px] text-text-muted ml-auto shrink-0"
+          >
+            {formatMessageTime(message.createdAt)}
+          </time>
         </div>
 
-        {/* Body bubble */}
+        {/* Neutral message surface */}
         <div
           className={cn(
-            'rounded-inner px-3.5 py-2.5 text-sm leading-relaxed',
-            'border shadow-card',
+            'rounded-[10px] px-3.5 py-2.5 text-sm leading-relaxed border',
             isMine
-              ? 'bg-tint-blue-bg text-text-primary border-tint-blue-border rounded-tr-sm'
-              : 'bg-surface text-text-primary border-border-subtle rounded-tl-sm',
+              ? 'bg-slate-50/80 text-text-primary border-border-subtle'
+              : 'bg-surface text-text-primary border-border-subtle',
           )}
         >
-          {/* Plain text — whitespace preserved, HTML not interpreted */}
-          <p className="whitespace-pre-wrap break-words">{message.body}</p>
+          <p className="whitespace-pre-wrap break-words">
+            <SafeFormattedText text={message.body} />
+          </p>
         </div>
-
-        {/* Timestamp */}
-        <time
-          dateTime={message.createdAt}
-          className="text-[10px] text-text-muted px-0.5"
-        >
-          {formatMessageTime(message.createdAt)}
-        </time>
       </div>
     </div>
   )
 }
-

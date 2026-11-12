@@ -11,58 +11,58 @@ const SYSTEM_ROLES: Array<{
   permissions: IRolePermission[]
   isSystem: boolean
 }> = [
-  {
-    name: 'Super Admin',
-    isSystem: true,
-    permissions: [
-      { key: 'task.view', scope: 'all' },
-      { key: 'task.create', scope: 'all' },
-      { key: 'task.edit', scope: 'all' },
-      { key: 'task.status', scope: 'all' },
-      { key: 'task.delete', scope: 'all' },
-      { key: 'report.view', scope: 'all' },
-      { key: 'user.manage', scope: 'all' },
-      { key: 'team.manage', scope: 'all' },
-      { key: 'branch.manage', scope: 'all' },
-      { key: 'role.manage', scope: 'all' },
-    ],
-  },
-  {
-    name: 'Branch Admin',
-    isSystem: true,
-    permissions: [
-      { key: 'task.view', scope: 'branch' },
-      { key: 'task.create', scope: 'branch' },
-      { key: 'task.edit', scope: 'branch' },
-      { key: 'task.status', scope: 'branch' },
-      { key: 'task.delete', scope: 'branch' },
-      { key: 'report.view', scope: 'branch' },
-      { key: 'user.manage', scope: 'branch' },
-      { key: 'team.manage', scope: 'branch' },
-    ],
-  },
-  {
-    name: 'Team Lead',
-    isSystem: true,
-    permissions: [
-      { key: 'task.view', scope: 'team' },
-      { key: 'task.create', scope: 'team' },
-      { key: 'task.edit', scope: 'team' },
-      { key: 'task.status', scope: 'team' },
-      { key: 'report.view', scope: 'team' },
-    ],
-  },
-  {
-    name: 'Member',
-    isSystem: true,
-    permissions: [
-      { key: 'task.view', scope: 'team' },
-      { key: 'task.create', scope: 'own' },
-      { key: 'task.edit', scope: 'own' },
-      { key: 'task.status', scope: 'own' },
-    ],
-  },
-]
+    {
+      name: 'Super Admin',
+      isSystem: true,
+      permissions: [
+        { key: 'task.view', scope: 'all' },
+        { key: 'task.create', scope: 'all' },
+        { key: 'task.edit', scope: 'all' },
+        { key: 'task.status', scope: 'all' },
+        { key: 'task.delete', scope: 'all' },
+        { key: 'report.view', scope: 'all' },
+        { key: 'user.manage', scope: 'all' },
+        { key: 'team.manage', scope: 'all' },
+        { key: 'branch.manage', scope: 'all' },
+        { key: 'role.manage', scope: 'all' },
+      ],
+    },
+    {
+      name: 'Branch Admin',
+      isSystem: true,
+      permissions: [
+        { key: 'task.view', scope: 'branch' },
+        { key: 'task.create', scope: 'branch' },
+        { key: 'task.edit', scope: 'branch' },
+        { key: 'task.status', scope: 'branch' },
+        { key: 'task.delete', scope: 'branch' },
+        { key: 'report.view', scope: 'branch' },
+        { key: 'user.manage', scope: 'branch' },
+        { key: 'team.manage', scope: 'branch' },
+      ],
+    },
+    {
+      name: 'Team Lead',
+      isSystem: true,
+      permissions: [
+        { key: 'task.view', scope: 'team' },
+        { key: 'task.create', scope: 'team' },
+        { key: 'task.edit', scope: 'team' },
+        { key: 'task.status', scope: 'team' },
+        { key: 'report.view', scope: 'team' },
+      ],
+    },
+    {
+      name: 'Member',
+      isSystem: true,
+      permissions: [
+        { key: 'task.view', scope: 'team' },
+        { key: 'task.create', scope: 'own' },
+        { key: 'task.edit', scope: 'own' },
+        { key: 'task.status', scope: 'own' },
+      ],
+    },
+  ]
 
 export async function runSeed(): Promise<void> {
   console.log('🌱 Starting database seeding...')

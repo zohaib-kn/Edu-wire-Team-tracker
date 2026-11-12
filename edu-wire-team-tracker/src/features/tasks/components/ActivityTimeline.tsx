@@ -8,8 +8,9 @@ export interface ActivityTimelineProps {
 export function ActivityTimeline({ activities = [] }: ActivityTimelineProps) {
   if (!activities || activities.length === 0) {
     return (
-      <div className="py-6 text-center text-xs text-text-muted border border-dashed border-border-subtle rounded-inner">
-        No activity history recorded for this task yet.
+      <div className="py-5 px-4 flex items-center justify-center gap-2 text-center text-xs text-text-muted border border-dashed border-border-subtle bg-slate-50/50 rounded-[10px]">
+        <Clock className="w-4 h-4 text-text-muted shrink-0" />
+        <span>No activity available.</span>
       </div>
     )
   }
@@ -32,7 +33,7 @@ export function ActivityTimeline({ activities = [] }: ActivityTimelineProps) {
         return {
           label: 'Status changed',
           icon: ArrowRightCircle,
-          colorClass: 'text-indigo-600 bg-indigo-50 border-indigo-200',
+          colorClass: 'text-brand-blue bg-tint-blue-bg border-tint-blue-border',
         }
       case 'deleted':
         return {
@@ -78,7 +79,7 @@ export function ActivityTimeline({ activities = [] }: ActivityTimelineProps) {
               <Icon className="w-3 h-3" />
             </div>
 
-            <div className="flex-1 bg-surface border border-border-subtle rounded-inner p-3.5 shadow-card">
+            <div className="flex-1 bg-surface border border-border-subtle rounded-[10px] p-3">
               <div className="flex items-center justify-between gap-2 mb-1">
                 <span className="font-semibold text-text-primary">
                   {config.label}
@@ -101,7 +102,7 @@ export function ActivityTimeline({ activities = [] }: ActivityTimelineProps) {
                       <span className="font-medium capitalize text-text-primary">
                         {change.field}:
                       </span>
-                      <span className="line-through text-text-muted/60">
+                      <span className="line-through text-text-muted">
                         {String(change.oldValue ?? '')}
                       </span>
                       <span>&rarr;</span>

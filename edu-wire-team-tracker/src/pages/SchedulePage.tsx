@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { PanelRightOpen, X } from 'lucide-react'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { useTasks } from '@/features/tasks/hooks/useTasks'
@@ -21,10 +21,12 @@ import { SelectedDaySummary } from '@/features/schedule/components/SelectedDaySu
 import { DayView } from '@/features/schedule/components/DayView'
 import { WeekView } from '@/features/schedule/components/WeekView'
 import { MonthView } from '@/features/schedule/components/MonthView'
+import { getTaskDetailNavState } from '@/features/tasks/utils/taskNavigation'
 import type { Task, TaskStatus, TaskPriority } from '@/features/tasks/types/task.types'
 
 export function SchedulePage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { user } = useAuth()
 
   // 1. Navigation & Calendar View State
@@ -157,7 +159,9 @@ export function SchedulePage() {
   }
 
   const handleTaskClick = (task: Task) => {
-    navigate(`/tasks/${encodeURIComponent(task.id)}`)
+    navigate(`/tasks/${encodeURIComponent(task.id)}`, {
+      state: getTaskDetailNavState(location),
+    })
   }
 
   return (

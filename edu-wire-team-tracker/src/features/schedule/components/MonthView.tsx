@@ -126,8 +126,8 @@ export function MonthView({
                         isToday
                           ? 'bg-brand-blue text-white font-bold shadow-xs'
                           : isCurrentMonth
-                          ? 'text-slate-800'
-                          : 'text-slate-400',
+                            ? 'text-slate-800'
+                            : 'text-slate-400',
                       )}
                     >
                       {day.getDate()}
@@ -158,31 +158,40 @@ export function MonthView({
 
                       const timeStr = task.deadlineAt
                         ? formatTimeAMPM(
-                            formatUTCInTimezone(
-                              task.deadlineAt,
-                              task.deadlineTimezone || 'Asia/Kolkata',
-                            ).time,
-                          )
+                          formatUTCInTimezone(
+                            task.deadlineAt,
+                            task.deadlineTimezone || 'Asia/Kolkata',
+                          ).time,
+                        )
                         : null
 
                       return (
                         <div
                           key={task.id}
+                          role={onTaskClick ? 'button' : undefined}
+                          tabIndex={onTaskClick ? 0 : undefined}
                           onClick={(e) => {
                             if (onTaskClick) {
                               e.stopPropagation()
                               onTaskClick(task)
                             }
                           }}
+                          onKeyDown={(e) => {
+                            if (onTaskClick && (e.key === 'Enter' || e.key === ' ')) {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              onTaskClick(task)
+                            }
+                          }}
                           className={cn(
-                            'px-1.5 py-0.5 rounded text-[11px] font-medium truncate flex items-center gap-1 border transition-all',
+                            'px-1.5 py-0.5 rounded text-[11px] font-medium truncate flex items-center gap-1 border transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue',
                             isTaskDone
                               ? 'bg-emerald-50 text-emerald-800 border-emerald-200 line-through opacity-70'
                               : isTaskLate
-                              ? 'bg-rose-50 text-rose-800 border-rose-200 font-semibold'
-                              : isTaskDoing
-                              ? 'bg-amber-50 text-amber-800 border-amber-200'
-                              : 'bg-slate-100 text-slate-700 border-slate-200 hover:border-slate-300',
+                                ? 'bg-rose-50 text-rose-800 border-rose-200 font-semibold'
+                                : isTaskDoing
+                                  ? 'bg-amber-50 text-amber-800 border-amber-200'
+                                  : 'bg-slate-100 text-slate-700 border-slate-200 hover:border-slate-300',
                           )}
                           title={`${task.title}${timeStr ? ` · ${timeStr}` : ''}`}
                         >
@@ -193,10 +202,10 @@ export function MonthView({
                               isTaskDone
                                 ? 'bg-emerald-500'
                                 : isTaskLate
-                                ? 'bg-rose-500'
-                                : isTaskDoing
-                                ? 'bg-amber-500'
-                                : 'bg-brand-blue',
+                                  ? 'bg-rose-500'
+                                  : isTaskDoing
+                                    ? 'bg-amber-500'
+                                    : 'bg-brand-blue',
                             )}
                           />
                           {timeStr && (

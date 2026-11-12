@@ -12,7 +12,8 @@ import {
   type CSSProperties,
   type MouseEvent as ReactMouseEvent,
   type ReactElement,
-  type ReactNode
+  type ReactNode,
+  type Ref
 } from 'react';
 
 export interface FolderItem {
@@ -37,9 +38,14 @@ export interface FolderProps {
   tabPosition?: 'left' | 'center' | 'right';
   layout?: 'spread' | 'stack' | 'row';
   size?: number;
-  openOn?: 'click' | 'hover';
+  openOn?: 'click' | 'hover' | 'none';
   open?: boolean;
   defaultOpen?: boolean;
+  previewOnly?: boolean;
+  maxPreviewItems?: number;
+  ariaLabel?: string;
+  triggerRef?: Ref<HTMLDivElement>;
+  onFolderClick?: () => void;
   onOpenChange?: (open: boolean) => void;
   onItemClick?: (item: FolderEntry, index: number) => void;
   onItemDrop?: (item: FolderEntry, index: number, inside: boolean) => void;
@@ -259,6 +265,7 @@ interface Settings {
   depth: number;
   view: View;
   g: Geometry;
+  maxSpreadWidth?: number;
 }
 
 interface Engine {
@@ -1134,7 +1141,8 @@ const placeFlap = (
   phase: Phase,
   layout: string,
   g: Geometry,
-  pointer: number | null
+  pointer: number | null,
+  maxSpreadWidth?: number
 ): Slot => {
   const rest = FLAP_REST[rank] ?? FLAP_REST[FLAP_REST.length - 1];
   const floor = g.tabH + g.h - 5 * g.scale - g.docH / 2;
@@ -1154,7 +1162,8 @@ const placeFlap = (
       };
     }
     const gap = 12 * g.scale;
-    const fit = Math.min(0.94, (g.w * 2.3 - gap * (count - 1)) / (count * g.docW));
+    const budget = maxSpreadWidth && maxSpreadWidth > 0 ? Math.min(g.w * 2.3, maxSpreadWidth) : g.w * 2.3;
+    const fit = clamp((budget - gap * (count - 1)) / Math.max(1, count * g.docW), 0.35, 0.94);
     const step = g.docW * fit + gap;
     const tidy = layout === 'row';
     return {
@@ -1187,6 +1196,11 @@ export const Folder = ({
   openOn = 'click',
   open,
   defaultOpen = false,
+  previewOnly = false,
+  maxPreviewItems,
+  ariaLabel,
+  triggerRef,
+  onFolderClick,
   onOpenChange,
   onItemClick,
   onItemDrop,
@@ -1217,19 +1231,35 @@ export const Folder = ({
   const rendererRef = useRef<Renderer | null>(null);
   const [internalOpen, setInternalOpen] = useState(defaultOpen);
   const [labelWidth, setLabelWidth] = useState(0);
+  const [containerWidth, setContainerWidth] = useState<number>(0);
   const [outside, setOutside] = useState<number[]>([]);
   const [gpu, setGpu] = useState(false);
   const isControlled = open !== undefined;
-  const isOpen = isControlled ? Boolean(open) : internalOpen;
+  const isOpen = previewOnly ? false : isControlled ? Boolean(open) : internalOpen;
+  const effectiveDraggable = previewOnly ? false : draggable;
   const book = mode === 'book';
   const glass = variant === 'glass';
 
   const entries = useMemo<FolderEntry[]>(() => {
     const custom = Children.toArray(children).filter(isValidElement);
     const source = custom.length ? custom : items?.length ? items : DEFAULT_ITEMS;
-    return source.slice(0, MAX_ITEMS);
-  }, [children, items]);
+    const limit = previewOnly ? clamp(maxPreviewItems ?? 3, 1, 3) : MAX_ITEMS;
+    return source.slice(0, limit);
+  }, [children, items, previewOnly, maxPreviewItems]);
   const count = entries.length;
+
+  useEffect(() => {
+    if (previewOnly) return undefined;
+    const host = rootRef.current?.parentElement;
+    if (!host || typeof ResizeObserver === 'undefined') return undefined;
+    const updateWidth = () => {
+      setContainerWidth(host.clientWidth);
+    };
+    updateWidth();
+    const ro = new ResizeObserver(updateWidth);
+    ro.observe(host);
+    return () => ro.disconnect();
+  }, [previewOnly]);
 
   const scale = Math.max(0.3, Number(size) || 1);
   const g = measureFolder(book, scale, labelWidth, Boolean(label), tabPosition);
@@ -1254,11 +1284,12 @@ export const Folder = ({
 
   const setOpen = useCallback(
     (next: boolean | ((open: boolean) => boolean)) => {
+      if (previewOnly) return;
       const value = typeof next === 'function' ? next(isOpen) : next;
       if (!isControlled) setInternalOpen(value);
       if (value !== isOpen) onOpenChange?.(value);
     },
-    [isControlled, isOpen, onOpenChange]
+    [previewOnly, isControlled, isOpen, onOpenChange]
   );
 
   const setOpenRef = useRef(setOpen);
@@ -1277,7 +1308,7 @@ export const Folder = ({
     openOn,
     peek,
     intro,
-    draggable,
+    draggable: effectiveDraggable,
     zoomOnClick,
     closeOnOutsideClick,
     onItemClick,
@@ -1297,7 +1328,8 @@ export const Folder = ({
     content: `${mode}|${scale}|${paperColor}|${color}|${g.tabX}|${g.tabW}`,
     depth: Math.round(Math.max(g.w, g.h) * 5),
     view,
-    g
+    g,
+    maxSpreadWidth: containerWidth > 0 ? Math.max(g.w, containerWidth - 16) : undefined
   };
 
   useEffect(() => {
@@ -1490,7 +1522,7 @@ export const Folder = ({
     const place = (rank: number, inside: number, phase: Phase, s: Settings) => {
       if (s.g.book) return placeBook(rank, inside, phase, s.layout, s.g);
       const pointer = state.hovered ? ((state.pointerX + 1) / 2) * s.g.w : null;
-      return placeFlap(rank, inside, phase, s.layout, s.g, pointer);
+      return placeFlap(rank, inside, phase, s.layout, s.g, pointer, s.maxSpreadWidth);
     };
 
     const approach = (item: ItemState, slot: Slot, s: Settings): Slot => {
@@ -2198,12 +2230,18 @@ export const Folder = ({
   });
 
   const toggle = () => {
+    if (previewOnly) {
+      onFolderClick?.();
+      return;
+    }
     if (engineRef.current?.blur()) return;
-    if (openOn === 'hover') return;
+    if (openOn === 'hover' || openOn === 'none') return;
+    onFolderClick?.();
     setOpen(!isOpen);
   };
 
   const onItemActivate = (event: ReactMouseEvent<HTMLDivElement>, index: number) => {
+    if (previewOnly) return;
     const engine = engineRef.current;
     if (!engine) return;
     if (engine.consumeClick()) {
@@ -2257,19 +2295,21 @@ export const Folder = ({
       data-theme={theme === 'light' ? 'light' : 'dark'}
       data-open={isOpen ? '' : undefined}
       data-gl={glass && gpu ? '' : undefined}
-      data-draggable={draggable ? '' : undefined}
+      data-draggable={effectiveDraggable ? '' : undefined}
       style={vars}
     >
       <div
-        className="group/stage absolute inset-0 isolate cursor-pointer outline-none"
+        ref={triggerRef}
+        className="group/stage absolute inset-0 isolate cursor-pointer outline-none rounded-[12px] focus-visible:ring-2 focus-visible:ring-brand-blue focus-visible:ring-offset-2"
         style={{
           perspective: 'var(--folder-depth)',
           perspectiveOrigin: 'calc(var(--folder-w) / 2) calc(var(--folder-tab-h) + var(--folder-h) / 2)'
         }}
         role="button"
         tabIndex={0}
-        aria-expanded={isOpen}
-        aria-label={label ? `${label} folder` : 'Folder'}
+        aria-haspopup={previewOnly ? 'dialog' : undefined}
+        aria-expanded={previewOnly ? undefined : isOpen}
+        aria-label={ariaLabel ?? (label ? `${label} folder` : 'Folder')}
         onClick={toggle}
         onKeyDown={event => {
           if (event.target !== event.currentTarget) return;
@@ -2357,27 +2397,28 @@ export const Folder = ({
         </div>
 
         {entries.map((item, index) => {
-          const interactive = isOpen || outside.includes(index);
+          const interactive = !previewOnly && (isOpen || outside.includes(index));
           return (
             <div
               key={isValidElement(item) && item.key != null ? item.key : index}
               ref={node => {
                 itemRefs.current[index] = node;
               }}
-              className={`${LAYER} z-[10] overflow-hidden outline-none focus-visible:outline-2 focus-visible:outline-offset-[3px] focus-visible:outline-solid focus-visible:[outline-color:var(--folder-focus)]`}
+              className={`${LAYER} z-[10] overflow-hidden outline-none focus-visible:outline-2 focus-visible:outline-offset-[3px] focus-visible:outline-solid focus-visible:[outline-color:var(--folder-focus)] ${previewOnly ? 'pointer-events-none' : ''}`.trim()}
               style={{
                 width: 'var(--folder-doc-w)',
                 height: 'var(--folder-doc-h)',
                 borderRadius: 'calc(7px * var(--folder-scale))',
                 background: 'var(--folder-paper)',
                 boxShadow: PAPER_SHADOW,
-                cursor: draggable ? 'grab' : isOpen ? 'pointer' : undefined,
-                touchAction: draggable ? 'none' : undefined
+                cursor: effectiveDraggable ? 'grab' : interactive ? 'pointer' : undefined,
+                touchAction: effectiveDraggable ? 'none' : undefined
               }}
+              aria-hidden={previewOnly ? true : undefined}
               data-folder-item={index}
               role={interactive ? 'button' : undefined}
               tabIndex={interactive ? 0 : -1}
-              onClick={event => onItemActivate(event, index)}
+              onClick={interactive ? event => onItemActivate(event, index) : undefined}
               onKeyDown={event => {
                 if (!interactive || (event.key !== 'Enter' && event.key !== ' ')) return;
                 event.preventDefault();

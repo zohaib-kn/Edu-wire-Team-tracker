@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { Bell, CheckCheck, Inbox, Check, AlarmClock, AlertTriangle } from 'lucide-react'
 import { useNotifications, useMarkAsRead, useMarkAllRead } from '../hooks/useNotifications'
+import { getTaskDetailNavState } from '@/features/tasks/utils/taskNavigation'
 import type { AppNotification } from '../types/notification.types'
 
 function formatTimeAgo(isoString: string): string {
@@ -28,6 +29,7 @@ export function NotificationBell() {
   const [isOpen, setIsOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
+  const location = useLocation()
 
   const { data, isLoading } = useNotifications()
   const { mutate: markAsRead } = useMarkAsRead()
@@ -55,10 +57,11 @@ export function NotificationBell() {
     setIsOpen(false)
 
     if (notif.taskId) {
+      const navState = getTaskDetailNavState(location)
       if (notif.type === 'task_discussion_message') {
-        navigate(`/tasks/${notif.taskId}?tab=discussion`)
+        navigate(`/tasks/${encodeURIComponent(notif.taskId)}?tab=discussion`, { state: navState })
       } else {
-        navigate(`/tasks/${notif.taskId}`)
+        navigate(`/tasks/${encodeURIComponent(notif.taskId)}`, { state: navState })
       }
     }
   }

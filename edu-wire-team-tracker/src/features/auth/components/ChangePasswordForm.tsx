@@ -114,11 +114,10 @@ export function ChangePasswordForm() {
         </span>
         <div className="flex items-center gap-2">
           <span
-            className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] ${
-              hasMinLength
+            className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] ${hasMinLength
                 ? 'bg-green-100 text-[#16A34A]'
                 : 'bg-slate-200 text-slate-500'
-            }`}
+              }`}
           >
             <Check className="w-3 h-3" />
           </span>
@@ -128,11 +127,10 @@ export function ChangePasswordForm() {
         </div>
         <div className="flex items-center gap-2">
           <span
-            className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] ${
-              hasLetter
+            className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] ${hasLetter
                 ? 'bg-green-100 text-[#16A34A]'
                 : 'bg-slate-200 text-slate-500'
-            }`}
+              }`}
           >
             <Check className="w-3 h-3" />
           </span>
@@ -142,11 +140,10 @@ export function ChangePasswordForm() {
         </div>
         <div className="flex items-center gap-2">
           <span
-            className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] ${
-              hasNumber
+            className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] ${hasNumber
                 ? 'bg-green-100 text-[#16A34A]'
                 : 'bg-slate-200 text-slate-500'
-            }`}
+              }`}
           >
             <Check className="w-3 h-3" />
           </span>

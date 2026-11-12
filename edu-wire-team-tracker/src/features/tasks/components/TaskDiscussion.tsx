@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { toast } from 'sonner'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { useTaskMessages } from '../hooks/useTaskMessages'
@@ -19,6 +19,9 @@ export interface TaskDiscussionProps {
  */
 export function TaskDiscussion({ taskId, taskIsDone = false }: TaskDiscussionProps) {
   const { user } = useAuth()
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const hasInitializedRef = useRef(false)
+  const prevLengthRef = useRef(0)
 
   const {
     data,
@@ -29,6 +32,28 @@ export function TaskDiscussion({ taskId, taskIsDone = false }: TaskDiscussionPro
 
   const { mutateAsync: postMessage, isPending: isSending } = usePostTaskMessage(taskId)
 
+  const messages = data?.messages ?? []
+  const currentUserId = user?.id ?? ''
+
+  // Keep scroll stable on initial load; scroll inside message container when new messages arrive
+  useEffect(() => {
+    if (isLoading) return
+
+    if (!hasInitializedRef.current) {
+      hasInitializedRef.current = true
+      prevLengthRef.current = messages.length
+      return
+    }
+
+    if (messages.length > prevLengthRef.current && scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTo({
+        top: scrollContainerRef.current.scrollHeight,
+        behavior: 'smooth',
+      })
+    }
+    prevLengthRef.current = messages.length
+  }, [isLoading, messages.length])
+
   const handleSend = useCallback(
     async (body: string, type: TaskMessageType) => {
       if (!body.trim()) return
@@ -38,14 +63,12 @@ export function TaskDiscussion({ taskId, taskIsDone = false }: TaskDiscussionPro
     [postMessage],
   )
 
-  const messages = data?.messages ?? []
-  const currentUserId = user?.id ?? ''
-
   return (
     <div className="flex flex-col gap-4">
-      {/* Message list with auto-scroll */}
+      {/* Message list: natural flow on mobile to avoid nested scroll traps; bounded scroll on desktop */}
       <div
-        className="max-h-[420px] overflow-y-auto pr-1 scroll-smooth"
+        ref={scrollContainerRef}
+        className="md:max-h-[400px] md:overflow-y-auto md:pr-1 scroll-smooth"
         aria-live="polite"
         aria-label="Task discussion messages"
       >
@@ -70,4 +93,3 @@ export function TaskDiscussion({ taskId, taskIsDone = false }: TaskDiscussionPro
     </div>
   )
 }
-
